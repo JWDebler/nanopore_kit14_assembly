@@ -350,7 +350,7 @@ process nextdenovo {
     label "nextdenovo"
     tag {sampleID}
     publishDir "${params.outdir}/${sampleID}/03-assembly", mode: 'copy', pattern: '*_nextdenovo.fasta'
-    publishDir "${params.outdir}/${sampleID}/02-aprocessed-reads", mode: 'copy', pattern: '*corredted.fasta'
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*corredted.fasta'
 
     input:
     tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" from FilteredForNextdenovo
