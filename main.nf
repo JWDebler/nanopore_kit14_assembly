@@ -198,7 +198,7 @@ process minimap_DCS {
     tag {sampleID}
 
     input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForChopper
+    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsForDCSQC
 
     output:
     tuple sampleID, 'duplex.sam', 'simplex.sam' into DCSalignments
