@@ -58,11 +58,7 @@ if ( params.reads ) {
     .fromFilePairs(params.reads + "*{sim,du}plex.fastq.gz")
     .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
     .map { sampleID -> [sampleID[0]] + sampleID[1] }
-    .tap { ReadsForCorrection }
-    .tap { ReadsDuplexForChopper }
-    .tap { ReadsSimplexForChopper }
-    .tap { ReadsDuplexForQC }
-    .tap { ReadsSimplexForQC }
+    .tap { ReadsForDCSQC }
     .view()
     //    .into { samples }
 } else {
@@ -70,11 +66,7 @@ if ( params.reads ) {
     .fromFilePairs("*{sim,du}plex.fastq.gz")
     .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
     .map { sampleID -> [sampleID[0]] + sampleID[1] }
-    .tap { ReadsForCorrection }
-    .tap { ReadsDuplexForChopper }
-    .tap { ReadsSimplexForChopper }
-    .tap { ReadsDuplexForQC }
-    .tap { ReadsSimplexForQC }
+    .tap { ReadsForDCSQC }
     .view()
 }
 
@@ -150,6 +142,33 @@ process chopper_version {
     """
 }
 
+process minimap2_version {
+
+    label "minimap2"
+
+    output:
+    path 'versions.txt' into minimap2_version
+
+    """
+    echo minimap2: >> versions.txt
+    minimap2 --version >> versions.txt
+    echo --------------- >> versions.txt
+    """
+}
+
+process samtools_version {
+
+    label "samtools"
+
+    output:
+    path 'versions.txt' into samtools_version
+
+    """
+    echo samtools: >> versions.txt
+    samtools version >> versions.txt
+    echo --------------- >> versions.txt
+    """
+}
 
 process version {
 
@@ -159,6 +178,8 @@ process version {
     path "seqkit.txt" from seqkit_version
     path "flye.txt" from flye_version
     path "chopper.txt" from chopper_version
+    path "minimap2.txt" from minimap2_version
+    path "samtools.txt" from samtools_version
 
     publishDir "${params.outdir}/", mode: 'copy', pattern: 'versions.txt'
 
@@ -167,13 +188,54 @@ process version {
 
     script:
     """
-    cat canu.txt medaka.txt seqkit.txt flye.txt chopper.txt > versions.txt
+    cat canu.txt medaka.txt seqkit.txt flye.txt chopper.txt minimap2.txt samtools.txt > versions.txt
     """
 }
 
+process minimap_DCS {
+
+    label "minimap2"
+    tag {sampleID}
+
+    input:
+    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForChopper
+
+    output:
+    tuple sampleID, 'duplex.sam', 'simplex.sam' into DCSalignments
+
+    """
+    minimap2 -d dcs.mmi ${params.dcs}
+    minimap2 -t "${task.cpus}" -ax map-ont dcs.mmi duplex.fastq.gz > duplex.sam
+    minimap2 -t "${task.cpus}" -ax map-ont dcs.mmi simplex.fastq.gz > simplex.sam
+    """
+
+}
+
+process filter_DCS_reads {
+
+    label "samtools"
+    tag {sampleID}
+
+    input:
+    tuple sampleID, 'duplex.sam', 'simplex.sam' from DCSalignments
+
+    output:
+    tuple sampleID, 'dulex.fastq', 'simplex.fastq' into DCSFilteredReads
+
+    """
+    samtools view -@ "${task.cpus}" -b -f 4 duplex.sam | samtools fastq -@ "${task.cpus}" - > duplex.fastq
+    samtools view -@ "${task.cpus}" -b -f 4 simplex.sam | samtools fastq -@ "${task.cpus}" - > simplex.fastq
+    """
+}
+
+DCSFilteredReads
+.tap { ReadsDuplexForChopper }
+.tap { ReadsSimplexForChopper }
+.tap { ReadsDuplexForQC }
+.tap { ReadsSimplexForQC }
+.tap { ReadsForCorrection }
 
 // filtering reads
-
 
 process chopper_Simplex {
 
@@ -182,14 +244,14 @@ process chopper_Simplex {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*.fastq.gz'
 
     input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForChopper
+    tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsSimplexForChopper
 
     output:
     path "${sampleID}.simplex.chopper.fastq.gz"
     tuple sampleID, "${sampleID}.simplex.chopper.fastq.gz" into FilteredSimplex
 
     """
-    gunzip -c simplex.fastq.gz | chopper -q 10 -l 1000 | gzip -9 > ${sampleID}.simplex.chopper.fastq.gz
+    cat simplex.fastq | chopper -q 10 -l 1000 | gzip -9 > ${sampleID}.simplex.chopper.fastq.gz
 
     """
 }
@@ -201,14 +263,14 @@ process chopper_Duplex {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*.fastq.gz'
 
     input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsDuplexForChopper
+    tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsDuplexForChopper
 
     output:
     path "${sampleID}.duplex.chopper.fastq.gz"
     tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz" into FilteredDuplex
 
     """
-    gunzip -c duplex.fastq.gz | chopper -q 10 -l 1000 | gzip -9 > ${sampleID}.duplex.chopper.fastq.gz
+    cat duplex.fastq | chopper -q 10 -l 1000 | gzip -9 > ${sampleID}.duplex.chopper.fastq.gz
     """
 }
 
@@ -220,14 +282,14 @@ process nanoplot_Raw_Duplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", mode: 'copy', pattern: '*.html'
 
     input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsDuplexForQC
+    tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsDuplexForQC
 
     output:
     path "*.html"
     
     """
     NanoPlot \
-    --fastq duplex.fastq.gz \
+    --fastq duplex.fastq \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.duplex.html
     """
@@ -240,7 +302,7 @@ process nanoplot_Raw_Simplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", mode: 'copy', pattern: '*.html'
 
     input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForQC
+    tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsSimplexForQC
 
     output:
     path "*.html"
@@ -248,7 +310,7 @@ process nanoplot_Raw_Simplex {
     
     """
     NanoPlot \
-    --fastq simplex.fastq.gz \
+    --fastq simplex.fastq \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.simplex.html
     """
@@ -490,7 +552,7 @@ process canu {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*.report'
 
     input:
-    tuple sampleID, "${sampleID}.duplex.fastq.gz", "${sampleID}.simplex.fastq.gz" from ReadsForCorrection
+    tuple sampleID, "${sampleID}.duplex.fastq", "${sampleID}.simplex.fastq" from ReadsForCorrection
 
     output:
     path "${sampleID}.simplex.corrected.fasta.gz"
@@ -507,7 +569,7 @@ process canu {
     -d ${sampleID} \
     genomeSize=${params.size} \
     ${fast_option} \
-    -nanopore ${sampleID}.simplex.fastq.gz
+    -nanopore ${sampleID}.simplex.fastq
 
     cp ${sampleID}/*correctedReads.fasta.gz ${sampleID}.simplex.corrected.fasta.gz
     cp ${sampleID}/*.report ${sampleID}.simplex.corrected.report
