@@ -221,7 +221,7 @@ process filter_DCS_reads {
     tuple sampleID, 'duplex.sam', 'simplex.sam' from DCSalignments
 
     output:
-    tuple sampleID, 'dulex.fastq', 'simplex.fastq' into DCSFilteredReads
+    tuple sampleID, 'duplex.fastq', 'simplex.fastq' into DCSFilteredReads
 
     """
     samtools view -@ "${task.cpus}" -b -f 4 duplex.sam | samtools fastq -@ "${task.cpus}" - > duplex.fastq
