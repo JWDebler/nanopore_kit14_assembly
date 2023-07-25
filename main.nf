@@ -204,7 +204,7 @@ process minimap_DCS {
     tuple sampleID, 'duplex.sam', 'simplex.sam' into DCSalignments
 
     """
-    wget https://github.com/JWDebler/nanopore_kit14_assembly/blob/main/data/DCS.fasta
+    wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
     minimap2 -d dcs.mmi DCS.fasta
     minimap2 -t "${task.cpus}" -ax map-ont dcs.mmi duplex.fastq.gz > duplex.sam
     minimap2 -t "${task.cpus}" -ax map-ont dcs.mmi simplex.fastq.gz > simplex.sam
