@@ -60,7 +60,7 @@ if ( params.reads ) {
     .map { sampleID -> [sampleID[0]] + sampleID[1] }
     .tap { ReadsForDCSQC }
     .view()
-    //    .into { samples }
+
 } else {
     nanoporeReads = Channel
     .fromFilePairs("*{sim,du}plex.fastq.gz")
@@ -204,7 +204,8 @@ process minimap_DCS {
     tuple sampleID, 'duplex.sam', 'simplex.sam' into DCSalignments
 
     """
-    minimap2 -d dcs.mmi ${params.dcs}
+    wget https://github.com/JWDebler/nanopore_kit14_assembly/blob/main/data/DCS.fasta
+    minimap2 -d dcs.mmi DCS.fasta
     minimap2 -t "${task.cpus}" -ax map-ont dcs.mmi duplex.fastq.gz > duplex.sam
     minimap2 -t "${task.cpus}" -ax map-ont dcs.mmi simplex.fastq.gz > simplex.sam
     """
