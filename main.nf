@@ -14,8 +14,11 @@ def helpMessage() {
     ## Parameters
     --reads <glob>
         Required
-        Folder containing basecalled and duplex separated Q20+ Nanopore reads.
-        Name scheme needs to be "SampleID.simplex.fastq.gz" and "SampleID.duplex.fastq.gz".
+        A folder containing two files per sample. 
+        The basename of the file is used as the sample ID and must contain 
+        `duplex` and `simplex`. 
+        Example of file names: `Sample1.duplex.fastq.gz`, `Sample1.simplex.fastq.gz`.
+        (Default: a folder called `reads/`)
 
     --genomeSize <glob>
         not required
@@ -24,17 +27,17 @@ def helpMessage() {
     --medakaModel <glob>
         not required
         Which basecaller model was used?
-        r1041_e82_400bps_sup_v4.2.0 (kit114, sup, 5khz)
-        r1041_e82_400bps_sup_v4.1.0 (kit114, sup, 4khz)
+        r1041_e82_400bps_sup_v4.2.0 (kit114, sup, 5 kHz)
+        r1041_e82_400bps_sup_v4.1.0 (kit114, sup, 4 kHz)
         (Default: r1041_e82_400bps_sup_v4.2.0)
 
     --canuSlow
-        Default: false
         Disables canu fast mode.
+        (Default: false)
 
     --outdir <path>
-        Default: `assembly`
         The directory to store the results in.
+        (Default: `assembly`)
 
     ## Exit codes
     - 0: All ok.
@@ -252,7 +255,7 @@ process chopper_Simplex {
     tuple sampleID, "${sampleID}.simplex.chopper.fastq.gz" into FilteredSimplex
 
     """
-    cat simplex.fastq | chopper -q 10 -l 1000 | gzip -9 > ${sampleID}.simplex.chopper.fastq.gz
+    cat simplex.fastq | chopper -q 10 -l 200 | gzip -9 > ${sampleID}.simplex.chopper.fastq.gz
 
     """
 }
@@ -271,7 +274,7 @@ process chopper_Duplex {
     tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz" into FilteredDuplex
 
     """
-    cat duplex.fastq | chopper -q 10 -l 1000 | gzip -9 > ${sampleID}.duplex.chopper.fastq.gz
+    cat duplex.fastq | chopper -q 10 -l 200 | gzip -9 > ${sampleID}.duplex.chopper.fastq.gz
     """
 }
 
@@ -368,16 +371,17 @@ FilterdForAssemblyDuplex.join(FilterdForAssemblySimplex)
 process mergeFilteredReads {
 
     tag {sampleID}
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*mergedSimplexDuplex.fastq.gz'
 
     input:
     tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" from FilteredForMedaka
 
     output:
-    tuple sampleID, "mergedSimplexDuplex.fastq.gz" into MergedFilteredForMedakaFlye
-    tuple sampleID, "mergedSimplexDuplex.fastq.gz" into MergedFilteredForMedakaNextdenovo
+    tuple sampleID, "${sampleID}.mergedSimplexDuplex.fastq.gz" into MergedFilteredForMedakaFlye
+    tuple sampleID, "${sampleID}.mergedSimplexDuplex.fastq.gz" into MergedFilteredForMedakaNextdenovo
 
     """
-    cat duplex.fastq.gz simplex.fastq.gz > mergedSimplexDuplex.fastq.gz
+    cat duplex.fastq.gz simplex.fastq.gz > ${sampleID}.mergedSimplexDuplex.fastq.gz
     """
 }
 
