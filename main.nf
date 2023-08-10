@@ -245,7 +245,7 @@ process chopper_Simplex {
 
     label "chopper"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*.fastq.gz'
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fastq.gz'
 
     input:
     tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsSimplexForChopper
@@ -264,7 +264,7 @@ process chopper_Duplex {
 
     label "chopper"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*.fastq.gz'
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fastq.gz'
 
     input:
     tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsDuplexForChopper
@@ -283,7 +283,7 @@ process nanoplot_Raw_Duplex {
 
     label "nanoplot"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/01-QC", mode: 'copy', pattern: '*.html'
+    publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
     tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsDuplexForQC
@@ -303,7 +303,7 @@ process nanoplot_Raw_Simplex {
 
     label "nanoplot"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/01-QC", mode: 'copy', pattern: '*.html'
+    publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
     tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsSimplexForQC
@@ -324,7 +324,7 @@ process nanoplot_Chopper_Duplex {
 
     label "nanoplot"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/01-QC", mode: 'copy', pattern: '*.html'
+    publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
     tuple sampleID, 'reads.fastq.gz' from FilteredDuplex
@@ -346,7 +346,7 @@ process nanoplot_Chopper_Simplex {
 
     label "nanoplot"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/01-QC", mode: 'copy', pattern: '*.html'
+    publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
     tuple sampleID, 'reads.fastq.gz' from FilteredSimplex
@@ -371,7 +371,7 @@ FilterdForAssemblyDuplex.join(FilterdForAssemblySimplex)
 process mergeFilteredReads {
 
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*mergedSimplexDuplex.fastq.gz'
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*mergedSimplexDuplex.fastq.gz'
 
     input:
     tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" from FilteredForMedaka
@@ -390,7 +390,7 @@ process flye {
 
     label "flye"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/03-assembly", mode: 'copy', pattern: '*_flye.fasta'
+    publishDir "${params.outdir}/${sampleID}/03-assembly", pattern: '*_flye.fasta'
 
     input:
     tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz", "${sampleID}.simplex.chopper.fastq.gz" from FilteredForFlye
@@ -416,8 +416,8 @@ process nextdenovo {
 
     label "nextdenovo"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/03-assembly", mode: 'copy', pattern: '*_nextdenovo.fasta'
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*corredted.fasta'
+    publishDir "${params.outdir}/${sampleID}/03-assembly", pattern: '*_nextdenovo.fasta'
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*corredted.fasta'
 
     input:
     tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" from FilteredForNextdenovo
@@ -515,13 +515,13 @@ process seqkitFlye {
     label "seqkit"
     tag {sampleID}
 
-    publishDir "${params.outdir}/${sampleID}/04-medaka-polished", mode: 'copy', pattern: '*.fasta'
+    publishDir "${params.outdir}/${sampleID}/04-medaka-polished", pattern: '*.fasta'
 
     input:
     tuple sampleID, "${sampleID}_flye_medaka.unsorted.fasta" from SeqkitFlye
 
     output:
-    tuple sampleID, "${sampleID}_flye_medaka.fasta"
+    tuple sampleID, "${sampleID}_flye_medaka.fasta" into FlyeForRagtag
 
     """
     seqkit sort -lr ${sampleID}_flye_medaka.unsorted.fasta > ${sampleID}_flye_medaka.sorted.fasta
@@ -534,17 +534,37 @@ process seqkitNextdenovo {
     label "seqkit"
     tag {sampleID}
 
-    publishDir "${params.outdir}/${sampleID}/04-medaka-polished", mode: 'copy', pattern: '*.fasta'
+    publishDir "${params.outdir}/${sampleID}/04-medaka-polished", pattern: '*.fasta'
 
     input:
     tuple sampleID, "${sampleID}_nextdenovo_medaka.unsorted.fasta" from SeqkitNextdenovo
 
     output:
-    tuple sampleID, "${sampleID}_nextdenovo_medaka.fasta"
+    tuple sampleID, "${sampleID}_nextdenovo_medaka.fasta" into NextDenovoForRagtag
 
     """
     seqkit sort -lr ${sampleID}_nextdenovo_medaka.unsorted.fasta > ${sampleID}_nextdenovo_medaka.sorted.fasta
     seqkit replace -p '.+' -r 'nd_ctg_{nr}' --nr-width 2 ${sampleID}_nextdenovo_medaka.sorted.fasta > ${sampleID}_nextdenovo_medaka.fasta
+    """
+}
+
+// compare assemblies with RagTag and order according to Nextdenovo
+
+process ragtag {
+
+    label "ragtag"
+    tag {sampleID}
+
+    publishDir "${params.outdir}/${sampleID}/", saveAs: '05-ragtag'
+
+    input:
+    tuple sampleID, "nextdenovo.fasta", "flye.fasta" from NextDenovoForRagtag.join(FlyeForRagtag)
+
+    output:
+    dir "ragtag_output"
+
+    """
+    ragtag.py scaffold nextdenovo.fasta flye.fasta
     """
 }
 
@@ -553,8 +573,8 @@ process canu {
 
     label "canu"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*.fasta.gz'
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", mode: 'copy', pattern: '*.report'
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fasta.gz'
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.report'
 
     input:
     tuple sampleID, "${sampleID}.duplex.fastq", "${sampleID}.simplex.fastq" from ReadsForCorrection
