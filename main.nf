@@ -131,6 +131,20 @@ process flye_version {
     """
 }
 
+process nextdenovo_version {
+
+    label "nextdenovo"
+
+    output:
+    path 'versions.txt' into flye_version
+
+    """
+    echo nextdenovo: >> versions.txt
+    nextDenovo --version >> versions.txt
+    echo --------------- >> versions.txt
+    """
+}
+
 process chopper_version {
 
     label "chopper"
@@ -180,6 +194,7 @@ process version {
     path "medaka.txt" from medaka_version
     path "seqkit.txt" from seqkit_version
     path "flye.txt" from flye_version
+    path "nextdenovo.txt" from nextdenovo_version
     path "chopper.txt" from chopper_version
     path "minimap2.txt" from minimap2_version
     path "samtools.txt" from samtools_version
@@ -191,7 +206,7 @@ process version {
 
     script:
     """
-    cat canu.txt medaka.txt seqkit.txt flye.txt chopper.txt minimap2.txt samtools.txt > versions.txt
+    cat canu.txt medaka.txt seqkit.txt flye.txt nextdenovo.txt chopper.txt minimap2.txt samtools.txt > versions.txt
     """
 }
 
