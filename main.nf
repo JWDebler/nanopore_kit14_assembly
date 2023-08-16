@@ -415,12 +415,11 @@ process flye {
 
     """
      flye \
-    --nano-corr ${sampleID}.duplex.chopper.fastq.gz ${sampleID}.simplex.chopper.fastq.gz \
+    --nano-hq ${sampleID}.duplex.chopper.fastq.gz ${sampleID}.simplex.chopper.fastq.gz \
     --read-error 0.03 \
     --genome-size ${params.size} \
     --asm-coverage 50 \
     --threads "${task.cpus}" \
-    --extra-params hpc_scoring_on=1,minimizer_window=10 \
     --out-dir ${sampleID}.flye 
 
     cp ${sampleID}.flye/assembly.fasta ${sampleID}_flye.fasta
