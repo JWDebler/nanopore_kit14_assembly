@@ -136,7 +136,7 @@ process nextdenovo_version {
     label "nextdenovo"
 
     output:
-    path 'versions.txt' into flye_version
+    path 'versions.txt' into nextdenovo_version
 
     """
     echo nextdenovo: >> versions.txt
