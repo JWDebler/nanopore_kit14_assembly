@@ -88,7 +88,22 @@ process canu_version {
 }
 
 
-process medaka_version {
+process version_canu {
+
+    label "canu"
+
+    output:
+    path 'versions.txt' into canu_version
+
+    """
+    echo canu: >> versions.txt
+    canu --version >> versions.txt
+    echo --------------- >> versions.txt
+    """
+}
+
+
+process version_medaka {
 
     label "medaka"
 
@@ -103,7 +118,7 @@ process medaka_version {
 }
 
 
-process seqkit_version {
+process version_seqkit {
 
     label "seqkit"
 
@@ -117,7 +132,7 @@ process seqkit_version {
     """
 }
 
-process flye_version {
+process version_flye{
 
     label "flye"
 
@@ -131,7 +146,7 @@ process flye_version {
     """
 }
 
-process nextdenovo_version {
+process version_nextdenovo {
 
     label "nextdenovo"
 
@@ -145,7 +160,7 @@ process nextdenovo_version {
     """
 }
 
-process chopper_version {
+process version_chopper {
 
     label "chopper"
 
@@ -159,7 +174,7 @@ process chopper_version {
     """
 }
 
-process minimap2_version {
+process version_minimap2 {
 
     label "minimap2"
 
@@ -173,7 +188,7 @@ process minimap2_version {
     """
 }
 
-process samtools_version {
+process version_samtools {
 
     label "samtools"
 
@@ -187,7 +202,7 @@ process samtools_version {
     """
 }
 
-process version {
+process versions {
 
     input:
     path "canu.txt" from canu_version
@@ -210,7 +225,7 @@ process version {
     """
 }
 
-process minimap_DCS {
+process QC_minimap_DCS {
 
     label "minimap2"
     tag {sampleID}
@@ -230,7 +245,7 @@ process minimap_DCS {
 
 }
 
-process filter_DCS_reads {
+process QC_filter_DCS_reads {
 
     label "samtools"
     tag {sampleID}
@@ -256,7 +271,7 @@ DCSFilteredReads
 
 // filtering reads
 
-process chopper_Simplex {
+process QC_chopper_Simplex {
 
     label "chopper"
     tag {sampleID}
@@ -275,7 +290,7 @@ process chopper_Simplex {
     """
 }
 
-process chopper_Duplex {
+process QC_chopper_Duplex {
 
     label "chopper"
     tag {sampleID}
@@ -294,7 +309,7 @@ process chopper_Duplex {
 }
 
 // read QC
-process nanoplot_Raw_Duplex {
+process QC_nanoplot_Raw_Duplex {
 
     label "nanoplot"
     tag {sampleID}
@@ -314,7 +329,7 @@ process nanoplot_Raw_Duplex {
     """
 }
 
-process nanoplot_Raw_Simplex {
+process QC_nanoplot_Raw_Simplex {
 
     label "nanoplot"
     tag {sampleID}
@@ -335,7 +350,7 @@ process nanoplot_Raw_Simplex {
     """
 }
 
-process nanoplot_Chopper_Duplex {
+process QC_nanoplot_Chopper_Duplex {
 
     label "nanoplot"
     tag {sampleID}
@@ -357,7 +372,7 @@ process nanoplot_Chopper_Duplex {
     """
 }
 
-process nanoplot_Chopper_Simplex {
+process QC_nanoplot_Chopper_Simplex {
 
     label "nanoplot"
     tag {sampleID}
@@ -401,7 +416,7 @@ process mergeFilteredReads {
 }
 
 // flye assembly
-process flye {
+process Assembly_flye {
 
     label "flye"
     tag {sampleID}
@@ -426,7 +441,7 @@ process flye {
     """
 }
 
-process nextdenovo {
+process Assembly_nextdenovo {
 
     label "nextdenovo"
     tag {sampleID}
@@ -477,7 +492,7 @@ process nextdenovo {
     """
 }
 
-process medaka_flye {
+process Polishing_medaka_flye {
 
     label "medaka"
     tag {sampleID}
@@ -501,7 +516,7 @@ process medaka_flye {
     """
 }
 
-process medaka_nextdenovo {
+process Polishing_medaka_nextdenovo {
 
     label "medaka"
     tag {sampleID}
@@ -524,7 +539,7 @@ process medaka_nextdenovo {
     """
 }
 
-process seqkitFlye {
+process Cleanup_seqkitFlye {
 
     label "seqkit"
     tag {sampleID}
@@ -543,7 +558,7 @@ process seqkitFlye {
     """
 }
 
-process seqkitNextdenovo {
+process Cleanup_seqkitNextdenovo {
 
     label "seqkit"
     tag {sampleID}
@@ -564,7 +579,7 @@ process seqkitNextdenovo {
 
 // compare assemblies with RagTag and order according to Nextdenovo
 
-process ragtag {
+process Cleanup_ragtag {
 
     label "ragtag"
     tag {sampleID}
@@ -583,7 +598,7 @@ process ragtag {
 }
 
 // read correction
-process canu {
+process Correction_canu {
 
     label "canu"
     tag {sampleID}
