@@ -8,8 +8,7 @@ def helpMessage() {
     A pipeline for assembly and polishing of fungal genomes from Oxford Nanopore Q20+ reads from Kit14 using Flye and Medaka.
 
     ## Examples
-    nextflow run nanopore_polishing.nf \
-    --nanoporeReads "03-trimmed-fastq/*.fastq.gz"
+    nextflow run jwdebler/nanopore_kit14_assembly -resume -latest -profile docker,nimbus --reads "reads/"
 
     ## Parameters
     --reads <glob>
@@ -72,21 +71,6 @@ if ( params.reads ) {
     .tap { ReadsForDCSQC }
     .view()
 }
-
-process canu_version {
-
-    label "canu"
-
-    output:
-    path 'versions.txt' into canu_version
-
-    """
-    echo canu: >> versions.txt
-    canu --version >> versions.txt
-    echo --------------- >> versions.txt
-    """
-}
-
 
 process version_canu {
 
@@ -584,16 +568,17 @@ process Cleanup_ragtag {
     label "ragtag"
     tag {sampleID}
 
-    publishDir "${params.outdir}/${sampleID}/", saveAs: '05-ragtag'
+    publishDir "${params.outdir}/${sampleID}/05-ragtag"
 
     input:
     tuple sampleID, "nextdenovo.fasta", "flye.fasta" from NextDenovoForRagtag.join(FlyeForRagtag)
 
     output:
-    path "ragtag_output"
+    path "ragtag.*"
 
     """
     ragtag.py scaffold nextdenovo.fasta flye.fasta
+    cp ragtag_output/* .
     """
 }
 
