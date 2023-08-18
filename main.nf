@@ -209,7 +209,7 @@ process versions {
     """
 }
 
-process QC_minimap_DCS {
+process QC_DCS_minimap {
 
     label "minimap2"
     tag {sampleID}
@@ -229,7 +229,7 @@ process QC_minimap_DCS {
 
 }
 
-process QC_filter_DCS_reads {
+process QC_DCS_filtering_reads {
 
     label "samtools"
     tag {sampleID}
