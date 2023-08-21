@@ -251,7 +251,6 @@ DCSFilteredReads
 .tap { ReadsSimplexForChopper }
 .tap { ReadsDuplexForQC }
 .tap { ReadsSimplexForQC }
-.tap { ReadsForCorrection }
 
 // filtering reads
 
@@ -265,11 +264,14 @@ process QC_chopper_Simplex {
     tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsSimplexForChopper
 
     output:
-    path "${sampleID}.simplex.chopper.fastq.gz"
-    tuple sampleID, "${sampleID}.simplex.chopper.fastq.gz" into FilteredSimplex
+    //path "${sampleID}.simplex.chopper.fastq.gz"
+    tuple sampleID, "${sampleID}.simplex.chopper.200bp.fastq.gz" into FilteredSimplex200
+    tuple sampleID, "${sampleID}.simplex.chopper.1000bp.fastq.gz" into FilteredSimplex1000
 
     """
-    cat simplex.fastq | chopper -q 10 -l 200 | gzip -9 > ${sampleID}.simplex.chopper.fastq.gz
+    cat simplex.fastq | chopper -q 10 -l 200 | ${sampleID}.simplex.chopper.200bp.fastq
+    ${sampleID}.simplex.chopper.200bp.fastq | chopper -l 1000 | gzip -9 > ${sampleID}.simplex.chopper.1000bp.fastq.gz
+    gzip -9 ${sampleID}.simplex.chopper.200bp.fastq 
 
     """
 }
@@ -284,11 +286,15 @@ process QC_chopper_Duplex {
     tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsDuplexForChopper
 
     output:
-    path "${sampleID}.duplex.chopper.fastq.gz"
-    tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz" into FilteredDuplex
+    //path "${sampleID}.simplex.chopper.fastq.gz"
+    tuple sampleID, "${sampleID}.duplex.chopper.200bp.fastq.gz" into FilteredDuplex200
+    tuple sampleID, "${sampleID}.duplex.chopper.1000bp.fastq.gz" into FilteredDuplex1000
+    tuple sampleID, "${sampleID}.duplex.chopper.1000bp.fastq.gz" into ReadsForCorrection
 
     """
-    cat duplex.fastq | chopper -q 10 -l 200 | gzip -9 > ${sampleID}.duplex.chopper.fastq.gz
+    cat duplex.fastq | chopper -q 10 -l 200 | ${sampleID}.duplex.chopper.200bp.fastq
+    ${sampleID}.duplex.chopper.200bp.fastq | chopper -l 1000 | gzip -9 > ${sampleID}.duplex.chopper.1000bp.fastq.gz
+    gzip -9 ${sampleID}.duplex.chopper.200bp.fastq
     """
 }
 
@@ -341,7 +347,7 @@ process QC_nanoplot_Chopper_Duplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
-    tuple sampleID, 'reads.fastq.gz' from FilteredDuplex
+    tuple sampleID, 'reads.fastq.gz' from FilteredDuplex1000
 
     output:
     path "*.html"
@@ -363,7 +369,7 @@ process QC_nanoplot_Chopper_Simplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
-    tuple sampleID, 'reads.fastq.gz' from FilteredSimplex
+    tuple sampleID, 'reads.fastq.gz' from FilteredSimplex1000
 
     output:
     path "*.html"
@@ -380,7 +386,6 @@ process QC_nanoplot_Chopper_Simplex {
 FilterdForAssemblyDuplex.join(FilterdForAssemblySimplex)
 .tap { FilteredForFlye }
 .tap { FilteredForNextdenovo }
-.tap { FilteredForMedaka }
 
 process mergeFilteredReads {
 
@@ -388,7 +393,7 @@ process mergeFilteredReads {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*mergedSimplexDuplex.fastq.gz'
 
     input:
-    tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" from FilteredForMedaka
+    tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" from FilteredDuplex200.join(FilteredSimplex200)
 
     output:
     tuple sampleID, "${sampleID}.mergedSimplexDuplex.fastq.gz" into MergedFilteredForMedakaFlye
