@@ -269,7 +269,7 @@ process QC_chopper_Simplex {
     tuple sampleID, "${sampleID}.simplex.chopper.1000bp.fastq.gz" into FilteredSimplex1000
 
     """
-    cat simplex.fastq | chopper -q 10 -l 200 | ${sampleID}.simplex.chopper.200bp.fastq
+    cat simplex.fastq | chopper -q 10 -l 200 > ${sampleID}.simplex.chopper.200bp.fastq
     ${sampleID}.simplex.chopper.200bp.fastq | chopper -l 1000 | gzip -9 > ${sampleID}.simplex.chopper.1000bp.fastq.gz
     gzip -9 ${sampleID}.simplex.chopper.200bp.fastq 
 
@@ -292,7 +292,7 @@ process QC_chopper_Duplex {
     tuple sampleID, "${sampleID}.duplex.chopper.1000bp.fastq.gz" into ReadsForCorrection
 
     """
-    cat duplex.fastq | chopper -q 10 -l 200 | ${sampleID}.duplex.chopper.200bp.fastq
+    cat duplex.fastq | chopper -q 10 -l 200 > ${sampleID}.duplex.chopper.200bp.fastq
     ${sampleID}.duplex.chopper.200bp.fastq | chopper -l 1000 | gzip -9 > ${sampleID}.duplex.chopper.1000bp.fastq.gz
     gzip -9 ${sampleID}.duplex.chopper.200bp.fastq
     """
