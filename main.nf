@@ -305,7 +305,7 @@ process QC_chopper_Duplex {
     """
     cat duplex.fastq | chopper -q ${params.quality} -l 200 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq
     cat ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq | chopper -l ${params.minlen} | gzip -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
-    gzip -9 ${sampleID}.duplex.chopper.200bp.fastq
+    gzip -9 ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq
     """
 }
 
