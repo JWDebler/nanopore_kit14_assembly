@@ -281,7 +281,7 @@ process QC_chopper_Simplex {
 
     """
     cat simplex.fastq | chopper -q ${params.quality} -l 200 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq
-    ${sampleID}.simplex.chopper.200bp.fastq | chopper -l ${params.minlen} -q ${params.quality}| gzip -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
+    cat ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq | chopper -l ${params.minlen} -q ${params.quality}| gzip -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
     gzip -9 ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq 
 
     """
