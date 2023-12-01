@@ -38,6 +38,14 @@ def helpMessage() {
         The directory to store the results in.
         (Default: `assembly`)
 
+    --minlen
+        Min read length to keep for assembly
+        (Default: 1000)
+
+    --quality
+        Min read q-score to keep for read filtering
+        (Default: 12)
+
     ## Exit codes
     - 0: All ok.
     - 1: Incomplete parameter inputs.
@@ -49,6 +57,8 @@ def helpMessage() {
 params.reads=""
 params.size="42m"
 params.medakaModel="r1041_e82_400bps_sup_v4.2.0"
+params.minlen="1000"
+params.quality="12"
 
 if (params.help) {
     helpMessage()
@@ -265,13 +275,14 @@ process QC_chopper_Simplex {
 
     output:
     //path "${sampleID}.simplex.chopper.fastq.gz"
-    tuple sampleID, "${sampleID}.simplex.chopper.200bp.fastq.gz" into FilteredSimplex200
-    tuple sampleID, "${sampleID}.simplex.chopper.1000bp.fastq.gz" into FilteredSimplex1000
+    tuple sampleID, "${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz" into FilteredSimplex200
+    tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into FilteredSimplex1000
+    tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into ReadsForCorrection
 
     """
-    cat simplex.fastq | chopper -q 10 -l 200 > ${sampleID}.simplex.chopper.200bp.fastq
-    ${sampleID}.simplex.chopper.200bp.fastq | chopper -l 1000 | gzip -9 > ${sampleID}.simplex.chopper.1000bp.fastq.gz
-    gzip -9 ${sampleID}.simplex.chopper.200bp.fastq 
+    cat simplex.fastq | chopper -q ${params.quality} -l 200 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq
+    ${sampleID}.simplex.chopper.200bp.fastq | chopper -l ${params.minlen} -q ${params.quality}| gzip -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
+    gzip -9 ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq 
 
     """
 }
@@ -287,13 +298,13 @@ process QC_chopper_Duplex {
 
     output:
     //path "${sampleID}.simplex.chopper.fastq.gz"
-    tuple sampleID, "${sampleID}.duplex.chopper.200bp.fastq.gz" into FilteredDuplex200
-    tuple sampleID, "${sampleID}.duplex.chopper.1000bp.fastq.gz" into FilteredDuplex1000
-    tuple sampleID, "${sampleID}.duplex.chopper.1000bp.fastq.gz" into ReadsForCorrection
+    tuple sampleID, "${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz" into FilteredDuplex200
+    tuple sampleID, "${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into FilteredDuplex1000
+    
 
     """
-    cat duplex.fastq | chopper -q 10 -l 200 > ${sampleID}.duplex.chopper.200bp.fastq
-    ${sampleID}.duplex.chopper.200bp.fastq | chopper -l 1000 | gzip -9 > ${sampleID}.duplex.chopper.1000bp.fastq.gz
+    cat duplex.fastq | chopper -q ${params.quality} -l 200 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq
+    cat ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq | chopper -l ${params.minlen} | gzip -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
     gzip -9 ${sampleID}.duplex.chopper.200bp.fastq
     """
 }
@@ -596,7 +607,7 @@ process Correction_canu {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.report'
 
     input:
-    tuple sampleID, "${sampleID}.duplex.fastq", "${sampleID}.simplex.fastq" from ReadsForCorrection
+    tuple sampleID, "${sampleID}.simplex.fastq.gz" from ReadsForCorrection
 
     output:
     path "${sampleID}.simplex.corrected.fasta.gz"
@@ -613,7 +624,7 @@ process Correction_canu {
     -d ${sampleID} \
     genomeSize=${params.size} \
     ${fast_option} \
-    -nanopore ${sampleID}.simplex.fastq
+    -nanopore ${sampleID}.simplex.fastq.gz
 
     cp ${sampleID}/*correctedReads.fasta.gz ${sampleID}.simplex.corrected.fasta.gz
     cp ${sampleID}/*.report ${sampleID}.simplex.corrected.report
