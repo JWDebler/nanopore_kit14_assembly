@@ -68,10 +68,12 @@ if (params.help) {
 if ( params.reads ) {
     nanoporeReads = Channel
     .fromFilePairs(params.reads + "*{sim,du}plex.fastq.gz")
-    .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
-    .map { sampleID -> [sampleID[0]] + sampleID[1] }
-    .tap { ReadsForDCSQC }
     .view()
+
+  //  .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
+   // .map { sampleID -> [sampleID[0]] + sampleID[1] }
+    //.tap { ReadsForDCSQC }
+    //.view()
 
 } else {
     log.info"""
