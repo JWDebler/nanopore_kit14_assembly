@@ -435,7 +435,7 @@ process Assembly_flye {
     --read-error 0.03 \
     --genome-size ${params.size} \
     --asm-coverage 50 \
-    --threads "${task.cpus}" \
+    --threads ${task.cpus} \
     --out-dir ${sampleID}.flye 
 
     cp ${sampleID}.flye/assembly.fasta ${sampleID}_flye.fasta
