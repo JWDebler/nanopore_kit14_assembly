@@ -74,12 +74,9 @@ if ( params.reads ) {
     .view()
 
 } else {
-    nanoporeReads = Channel
-    .fromFilePairs("*{sim,du}plex.fastq.gz")
-    .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
-    .map { sampleID -> [sampleID[0]] + sampleID[1] }
-    .tap { ReadsForDCSQC }
-    .view()
+    log.info"""
+    no reads supplied.
+    """
 }
 
 process version_canu {
