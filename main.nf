@@ -54,7 +54,7 @@ def helpMessage() {
 
 //by default script looks for reads in the current directory
 
-//params.reads=""
+params.reads=""
 params.size="42m"
 params.medakaModel="r1041_e82_400bps_sup_v4.2.0"
 params.minlen="1000"
@@ -68,17 +68,18 @@ if (params.help) {
 if ( params.reads ) {
     nanoporeReads = Channel
     .fromFilePairs(params.reads + "*{sim,du}plex.fastq.gz")
+    .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
+    .map { sampleID -> [sampleID[0]] + sampleID[1] }
+    .tap { ReadsForDCSQC }
     .view()
 
-  //  .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
-   // .map { sampleID -> [sampleID[0]] + sampleID[1] }
-    //.tap { ReadsForDCSQC }
-    //.view()
-
 } else {
-    log.info"""
-    no reads supplied.
-    """
+    nanoporeReads = Channel
+    .fromFilePairs("*{sim,du}plex.fastq.gz")
+    .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
+    .map { sampleID -> [sampleID[0]] + sampleID[1] }
+    .tap { ReadsForDCSQC }
+    .view()
 }
 
 process version_canu {
