@@ -277,7 +277,7 @@ process QC_chopper_Simplex {
     //path "${sampleID}.simplex.chopper.fastq.gz"
     tuple sampleID, "${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz" into FilteredSimplex200
     tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into FilteredSimplex1000
-    tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into ReadsForCorrection
+    //tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into ReadsForCorrection
 
     """
     cat simplex.fastq | chopper -q ${params.quality} -l 200 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq
@@ -396,7 +396,7 @@ process QC_nanoplot_Chopper_Simplex {
 
 FilterdForAssemblyDuplex.join(FilterdForAssemblySimplex)
 .tap { FilteredForFlye }
-.tap { FilteredForNextdenovo }
+//.tap { FilteredForNextdenovo }
 
 process mergeFilteredReads {
 
@@ -427,6 +427,7 @@ process Assembly_flye {
 
     output:
     tuple sampleID, "${sampleID}_flye.fasta" into MedakaFlye
+    tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz", "${sampleID}.simplex.chopper.fastq.gz" into FilteredForNextdenovo
 
     """
      flye \
@@ -454,6 +455,7 @@ process Assembly_nextdenovo {
     output:
     tuple sampleID, "${sampleID}_nextdenovo.fasta" into MedakaNextdenovo
     tuple sampleID, "${sampleID}.nextdenovo.corredted.fasta"
+    tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" into ReadsForCorrection
 
     """
     ls duplex.fastq.gz simplex.fastq.gz > ${sampleID}.fofn
@@ -607,7 +609,7 @@ process Correction_canu {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.report'
 
     input:
-    tuple sampleID, "${sampleID}.simplex.fastq.gz" from ReadsForCorrection
+    tuple sampleID,  "duplex.fastq.gz", "${sampleID}.simplex.fastq.gz" from ReadsForCorrection
 
     output:
     path "${sampleID}.simplex.corrected.fasta.gz"
