@@ -38,16 +38,21 @@ samtools view -O fastq -d dx:1 sampleID.dorado.bam |  gzip -9 >  sampleID.duplex
 
 After you have separated your reads into `sampleID.simplex.fastq.gz` and `sampleID.duplex.fastq.gz` you can run the pipeline by pointing `--reads` to the folder containing the fastq.gz files.
 
+On a Nimbus instance with 64 Gb of ram and 16 Cores:
 ```
 nextflow run jwdebler/nanopore_kit14_assembly -resume -latest -profile docker,nimbus --reads "reads/"
 ```
-
+On the P2 Solo lab computer:
+```
+nextflow run jwdebler/nanopore_kit14_assembly -resume -latest -profile docker,solo --reads "reads/"
+```
 
 ## Profiles
 
 We have a few profiles available to customise how the pipeline will run.
 
 - `nimbus` sets the canu assembler to use 15 CPUs and 60GB RAM.
+- `solo` sets paramaters to run on the lab computer running the P2 Solo sequencer.
 - `zeus` sets the canu assembler to use 14 CPUs and 64GB RAM, and sets some cluster specific options to use the slurm based scheduler at Pawsey.
 - `docker` and `docker_sudo` sets it to use docker containers, `docker_sudo` is identical except that docker is run as root (required for some installations of docker).
 
@@ -69,6 +74,14 @@ We have a few profiles available to customise how the pipeline will run.
     The model that was used during basecalling.
     r1041_e82_400bps_sup_v4.1.0 (kit 14, sup, 4 kHz)
     r941_min_sup_g507 (LSK109, sup, 4kHz)
+
+--minlen
+    Min read length to keep for assembly
+    (Default: 1000)
+
+--quality
+    Min read q-score to keep for read filtering
+    (Default: 10)
 
 --outdir <path>
     Default: `assembly`
