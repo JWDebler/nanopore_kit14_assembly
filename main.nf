@@ -476,13 +476,13 @@ process Assembly_nextdenovo {
     [correct_option]
     read_cutoff = 1k
     genome_size = ${params.size} # estimated genome size
-    sort_options = -m 4g -t 3
-    minimap2_options_raw = -t 3
+    sort_options = -m 4g -t 12
+    minimap2_options_raw = -t 12
     pa_correction = 5
     correction_options = -p 10
 
     [assemble_option]
-    minimap2_options_cns = -t 8
+    minimap2_options_cns = -t 12
     nextgraph_options = -a 1
     ''' > ${sampleID}.config
 
@@ -493,6 +493,7 @@ process Assembly_nextdenovo {
     cat ${sampleID}.nextdenovo/02.cns_align/01.seed_cns.sh.work/seed_cns*/cns.fasta > ${sampleID}.nextdenovo.corredted.fasta
     """
 }
+
 
 process Polishing_medaka_flye {
 
@@ -508,11 +509,11 @@ process Polishing_medaka_flye {
     """
     
     medaka_consensus \
-    -d flye.fasta \
     -i mergedReads.fastq.gz \
+    -d flye.fasta \
     -o ${sampleID}_medaka_output \
-    -t ${task.cpus} \
-    -m ${params.medakaModel}
+    -m ${params.medakaModel} \
+    -t ${task.cpus}
 
     cp ${sampleID}_medaka_output/consensus.fasta ${sampleID}_flye_medaka.fasta
     """
@@ -531,11 +532,11 @@ process Polishing_medaka_nextdenovo {
 
     """
     medaka_consensus \
-    -d nextdenovo.fasta \
     -i mergedReads.fastq.gz \
+    -d nextdenovo.fasta \
     -o ${sampleID}_medaka_output \
-    -t ${task.cpus} \
-    -m ${params.medakaModel}
+    -m ${params.medakaModel} \
+    -t ${task.cpus}
 
     cp ${sampleID}_medaka_output/consensus.fasta ${sampleID}_nextenovo_medaka.fasta
     """
