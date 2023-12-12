@@ -1,5 +1,15 @@
 # Nanopore assembly pipeline for kit 14 duplex called reads
 
+- [Nanopore assembly pipeline for kit 14 duplex called reads](#nanopore-assembly-pipeline-for-kit-14-duplex-called-reads)
+  - [Input](#input)
+    - [Basecall with Dorado:](#basecall-with-dorado)
+    - [Seperate simplex and duplex reads](#seperate-simplex-and-duplex-reads)
+  - [Running the pipeline](#running-the-pipeline)
+  - [Profiles](#profiles)
+  - [Parameters](#parameters)
+  - [Known problems](#known-problems)
+
+
 This is a Nanopore assembly pipeline aimed at Kit 14 generated reads which have been duplex called using the [dorado](https://github.com/nanoporetech/dorado/) basecaller. It requires that you have separated the reads into `sampleID.duplex.fastq.gz` and `sampleID.simplex.fastq.gz`.
 
 It then does some basice QC by removing control DNA which is sometimes used during a run to debug potential problems, but which should not end up in the final assembly.
@@ -87,3 +97,11 @@ We have a few profiles available to customise how the pipeline will run.
     Default: `assembly`
     The directory to store the results in.
 ```
+
+## Known problems
+If the pipeline gets stopped or crashes during the medaka steps there is a chance it will get stuck on that forever if restarted due to an index file that is too large. Should that happen to you check the hash for the assembly processes "Assembly_flye" and "Assembly_nextdenovo". The hashes look like that at the start of the respective line:
+
+[bc/a53374] process > Assembly_flye
+[a4/0cfae1] process > Assembly_nextdenovo
+
+Go to the folders `work/bc/a53374...` and delete the `*.fai` and `*.mmi` files. After that resume the pipeline and it will run medaka properly.
