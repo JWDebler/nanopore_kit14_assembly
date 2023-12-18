@@ -28,7 +28,7 @@ def helpMessage() {
         Which basecaller model was used?
         r1041_e82_400bps_sup_v4.2.0 (kit114, sup, 5 kHz)
         r1041_e82_400bps_sup_v4.1.0 (kit114, sup, 4 kHz)
-        (Default: r1041_e82_400bps_sup_v4.2.0)
+        (Default: r1041_e82_400bps_sup_v4.3.0)
 
     --canuSlow
         Disables canu fast mode.
@@ -56,7 +56,7 @@ def helpMessage() {
 
 params.reads=""
 params.size="42m"
-params.medakaModel="r1041_e82_400bps_sup_v4.2.0"
+params.medakaModel="r1041_e82_400bps_sup_v4.3.0"
 params.minlen="1000"
 params.quality="10"
 
