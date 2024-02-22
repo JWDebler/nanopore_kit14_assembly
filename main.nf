@@ -70,7 +70,10 @@ if ( params.reads ) {
     .fromFilePairs(params.reads + "*{sim,du}plex.fastq.gz")
     .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
     .map { sampleID -> [sampleID[0]] + sampleID[1] }
-    .tap { ReadsForDCSQC }
+    .tap { ReadsDuplexForChopper }
+    .tap { ReadsSimplexForChopper }
+    .tap { ReadsDuplexForQC }
+    .tap { ReadsSimplexForQC }
     .view()
 
 } else {
@@ -78,7 +81,10 @@ if ( params.reads ) {
     .fromFilePairs("*{sim,du}plex.fastq.gz")
     .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
     .map { sampleID -> [sampleID[0]] + sampleID[1] }
-    .tap { ReadsForDCSQC }
+    .tap { ReadsDuplexForChopper }
+    .tap { ReadsSimplexForChopper }
+    .tap { ReadsDuplexForQC }
+    .tap { ReadsSimplexForQC }
     .view()
 }
 
@@ -168,20 +174,6 @@ process version_chopper {
     """
 }
 
-process version_minimap2 {
-
-    label "minimap2"
-
-    output:
-    path 'versions.txt' into minimap2_version
-
-    """
-    echo minimap2: >> versions.txt
-    minimap2 --version >> versions.txt
-    echo --------------- >> versions.txt
-    """
-}
-
 process version_samtools {
 
     label "samtools"
@@ -205,7 +197,6 @@ process versions {
     path "flye.txt" from flye_version
     path "nextdenovo.txt" from nextdenovo_version
     path "chopper.txt" from chopper_version
-    path "minimap2.txt" from minimap2_version
     path "samtools.txt" from samtools_version
 
     publishDir "${params.outdir}/", mode: 'copy', pattern: 'versions.txt'
@@ -215,52 +206,9 @@ process versions {
 
     script:
     """
-    cat canu.txt medaka.txt seqkit.txt flye.txt nextdenovo.txt chopper.txt minimap2.txt samtools.txt > versions.txt
+    cat canu.txt medaka.txt seqkit.txt flye.txt nextdenovo.txt chopper.txt samtools.txt > versions.txt
     """
 }
-
-process QC_DCS_minimap {
-
-    label "minimap2"
-    tag {sampleID}
-
-    input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsForDCSQC
-
-    output:
-    tuple sampleID, 'duplex.sam', 'simplex.sam' into DCSalignments
-
-    """
-    wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
-    minimap2 -d dcs.mmi DCS.fasta
-    minimap2 -t "${task.cpus}" -ax map-ont dcs.mmi duplex.fastq.gz > duplex.sam
-    minimap2 -t "${task.cpus}" -ax map-ont dcs.mmi simplex.fastq.gz > simplex.sam
-    """
-
-}
-
-process QC_DCS_filtering_reads {
-
-    label "samtools"
-    tag {sampleID}
-
-    input:
-    tuple sampleID, 'duplex.sam', 'simplex.sam' from DCSalignments
-
-    output:
-    tuple sampleID, 'duplex.fastq', 'simplex.fastq' into DCSFilteredReads
-
-    """
-    samtools view -@ "${task.cpus}" -b -f 4 duplex.sam | samtools fastq -@ "${task.cpus}" - > duplex.fastq
-    samtools view -@ "${task.cpus}" -b -f 4 simplex.sam | samtools fastq -@ "${task.cpus}" - > simplex.fastq
-    """
-}
-
-DCSFilteredReads
-.tap { ReadsDuplexForChopper }
-.tap { ReadsSimplexForChopper }
-.tap { ReadsDuplexForQC }
-.tap { ReadsSimplexForQC }
 
 // filtering reads
 
@@ -271,19 +219,16 @@ process QC_chopper_Simplex {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fastq.gz'
 
     input:
-    tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsSimplexForChopper
+    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForChopper
 
     output:
-    //path "${sampleID}.simplex.chopper.fastq.gz"
     tuple sampleID, "${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz" into FilteredSimplex200
     tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into FilteredSimplex1000
-    //tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into ReadsForCorrection
-
+    
     """
-    cat simplex.fastq | chopper -q ${params.quality} -l 200 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq
-    cat ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq | chopper -l ${params.minlen} -q ${params.quality}| gzip -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
-    gzip -9 ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq 
-
+    wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
+    zcat simplex.fastq.gz | chopper --contam DCS.fasta -q ${params.quality} -l 200 | gzip -9 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz
+    zcat ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -l ${params.minlen} -q ${params.quality}| gzip -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
     """
 }
 
@@ -294,18 +239,17 @@ process QC_chopper_Duplex {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fastq.gz'
 
     input:
-    tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsDuplexForChopper
+    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsDuplexForChopper
 
     output:
-    //path "${sampleID}.simplex.chopper.fastq.gz"
     tuple sampleID, "${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz" into FilteredDuplex200
     tuple sampleID, "${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into FilteredDuplex1000
     
 
     """
-    cat duplex.fastq | chopper -q ${params.quality} -l 200 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq
-    cat ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq | chopper -l ${params.minlen} | gzip -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
-    gzip -9 ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq
+    wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
+    zcat duplex.fastq.gz | chopper --contam DCS.fasta -q ${params.quality} -l 200 | gzip -9 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz 
+    zcat ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -l ${params.minlen} | gzip -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
     """
 }
 
@@ -317,14 +261,14 @@ process QC_nanoplot_Raw_Duplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
-    tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsDuplexForQC
+    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsDuplexForQC
 
     output:
     path "*.html"
     
     """
     NanoPlot \
-    --fastq duplex.fastq \
+    --fastq duplex.fastq.gz \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.duplex.html
     """
@@ -337,7 +281,7 @@ process QC_nanoplot_Raw_Simplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
-    tuple sampleID, 'duplex.fastq', 'simplex.fastq' from ReadsSimplexForQC
+    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForQC
 
     output:
     path "*.html"
@@ -345,7 +289,7 @@ process QC_nanoplot_Raw_Simplex {
     
     """
     NanoPlot \
-    --fastq simplex.fastq \
+    --fastq simplex.fastq.gz \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.simplex.html
     """
@@ -420,7 +364,7 @@ process Assembly_flye {
 
     label "flye"
     tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/03-assembly", pattern: '*_flye.fasta'
+    publishDir "${params.outdir}/${sampleID}/03-assembly", pattern: '*_flye.*'
 
     input:
     tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz", "${sampleID}.simplex.chopper.fastq.gz" from FilteredForFlye
@@ -428,7 +372,7 @@ process Assembly_flye {
     output:
     tuple sampleID, "${sampleID}_flye.fasta" into MedakaFlye
     tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz", "${sampleID}.simplex.chopper.fastq.gz" into FilteredForNextdenovo
-
+    file "${sampleID}_flye.assembly_info.txt"
     """
      flye \
     --nano-hq ${sampleID}.duplex.chopper.fastq.gz ${sampleID}.simplex.chopper.fastq.gz \
@@ -439,6 +383,7 @@ process Assembly_flye {
     --out-dir ${sampleID}.flye 
 
     cp ${sampleID}.flye/assembly.fasta ${sampleID}_flye.fasta
+    cp ${sampleID}.flye/assembly_info.txt ${sampleID}_flye.assembly_info.txt
     """
 }
 
