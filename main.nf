@@ -212,26 +212,6 @@ process versions {
 
 // filtering reads
 
-process QC_chopper_Simplex {
-
-    label "chopper"
-    tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fastq.gz'
-
-    input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForChopper
-
-    output:
-    tuple sampleID, "${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz" into FilteredSimplex200
-    tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into FilteredSimplex1000
-    
-    """
-    wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
-    zcat simplex.fastq.gz | chopper --contam DCS.fasta -q ${params.quality} -l 200 | gzip -9 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz
-    zcat ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -l ${params.minlen} -q ${params.quality}| gzip -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
-    """
-}
-
 process QC_chopper_Duplex {
 
     label "chopper"
@@ -248,8 +228,28 @@ process QC_chopper_Duplex {
 
     """
     wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
-    zcat duplex.fastq.gz | chopper --contam DCS.fasta -q ${params.quality} -l 200 | gzip -9 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz 
-    zcat ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -l ${params.minlen} | gzip -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
+    zcat duplex.fastq.gz | chopper -t ${task.cpus} --contam DCS.fasta -q ${params.quality} -l 200 | pigz -9 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz 
+    zcat ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -t ${task.cpus} -l ${params.minlen} | pigz -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
+    """
+}
+
+process QC_chopper_Simplex {
+
+    label "chopper"
+    tag {sampleID}
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fastq.gz'
+
+    input:
+    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForChopper
+
+    output:
+    tuple sampleID, "${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz" into FilteredSimplex200
+    tuple sampleID, "${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz" into FilteredSimplex1000
+    
+    """
+    wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
+    zcat simplex.fastq.gz | chopper -t ${task.cpus} --contam DCS.fasta -q ${params.quality} -l 200 | pigz -9 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz
+    zcat ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -t ${task.cpus} -l ${params.minlen} -q ${params.quality}| pigz -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
     """
 }
 
