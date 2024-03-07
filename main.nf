@@ -228,7 +228,7 @@ process QC_chopper_Duplex {
 
     """
     wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
-    seqkit rmdup -n | chopper -t ${task.cpus} --contam DCS.fasta -q ${params.quality} -l 200 | pigz -9 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz 
+    seqkit rmdup -n duplex.fastq.gz | chopper -t ${task.cpus} --contam DCS.fasta -q ${params.quality} -l 200 | pigz -9 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz 
     zcat ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -t ${task.cpus} -l ${params.minlen} | pigz -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
     """
 }
