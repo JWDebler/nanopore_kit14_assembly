@@ -174,19 +174,6 @@ process version_chopper {
     """
 }
 
-process version_samtools {
-
-    label "samtools"
-
-    output:
-    path 'versions.txt' into samtools_version
-
-    """
-    echo samtools: >> versions.txt
-    samtools version >> versions.txt
-    echo --------------- >> versions.txt
-    """
-}
 
 process versions {
 
@@ -197,7 +184,6 @@ process versions {
     path "flye.txt" from flye_version
     path "nextdenovo.txt" from nextdenovo_version
     path "chopper.txt" from chopper_version
-    path "samtools.txt" from samtools_version
 
     publishDir "${params.outdir}/", mode: 'copy', pattern: 'versions.txt'
 
@@ -206,11 +192,12 @@ process versions {
 
     script:
     """
-    cat canu.txt medaka.txt seqkit.txt flye.txt nextdenovo.txt chopper.txt samtools.txt > versions.txt
+    cat canu.txt medaka.txt seqkit.txt flye.txt nextdenovo.txt chopper.txt> versions.txt
     """
 }
 
 // filtering reads
+// checks for duplicate read IDs and removes DCS reads
 
 process QC_chopper_Duplex {
 

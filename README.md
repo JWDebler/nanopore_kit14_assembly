@@ -2,8 +2,9 @@
 
 - [Nanopore assembly pipeline for kit 14 duplex called reads](#nanopore-assembly-pipeline-for-kit-14-duplex-called-reads)
   - [Input](#input)
-    - [Basecall with Dorado:](#basecall-with-dorado)
-    - [Seperate simplex and duplex reads](#seperate-simplex-and-duplex-reads)
+    - [Basecall with Dorado (non barcoded samples):](#basecall-with-dorado-non-barcoded-samples)
+      - [Seperate simplex and duplex reads](#seperate-simplex-and-duplex-reads)
+    - [Basecall with Dorado (barcoded samples as of Dorado 0.5.3)](#basecall-with-dorado-barcoded-samples-as-of-dorado-053)
   - [Running the pipeline](#running-the-pipeline)
   - [Profiles](#profiles)
   - [Parameters](#parameters)
@@ -23,12 +24,12 @@ Currently this pipeline is optimised to run on a Nimbus instance with 16 cores a
 
 The pipeline requires you to basecall your raw fast5 or pod5 files with dorado and then split the reads into simplex and duplex.
 
-### Basecall with Dorado:
+### Basecall with Dorado (non barcoded samples):
 
 ```
 dorado duplex sup pod5s/ -r > sampleID.dorado.bam
 ```
-### Seperate simplex and duplex reads
+#### Seperate simplex and duplex reads
 
 Dorado generates a BAM file containing both the simplex and duplex reads. The respective reads can be extracted from that BAM file using samtools.
 
@@ -37,6 +38,23 @@ samtools view -O fastq -d dx:0 sampleID.dorado.bam |  gzip -9 >  sampleID.simple
 samtools view -O fastq -d dx:1 sampleID.dorado.bam |  gzip -9 >  sampleID.duplex.fastq.gz
 ```
 
+### Basecall with Dorado (barcoded samples as of Dorado 0.5.3)
+As of version 0.5.3 Dorado can not yet do duplex calling and barcode demultiplexing in one go. The current workaround is to first call the reads in simplex and classification of barcodes, and then to extract a list of reads per barcode. Then you call the data again only using a subset of the already classified reads.
+The commands below also demultiplex the pod5 files into individual files per barcode. For this [pod5 tools](https://github.com/nanoporetech/pod5-file-format) need to be installed.
+
+```
+location=/path/to/raw/data/containing/folder
+
+dorado basecaller sup -r $location --kit-name SQK-NBD114-24 > all.bam && \
+dorado demux --output-dir simplex --no-classify all.bam && \
+rm simplex/*unclassified* && \
+for file in simplex/*.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtools view -h $file | cut -f 1 > simplex/$id.readids.txt; done && \
+for file in simplex/*readids.txt; do id=$(echo "$file" | grep -oP 'barcode\d+'); grep -v "@" $file > simplex/$id.clean.txt; done && \
+for file in simplex/*clean.txt; do id=$(echo "$file" | grep -oP 'barcode\d+'); pod5 filter -r $location -i $file -t 10 --missing-ok --duplicate-ok --output $id.pod5; done && \
+for pod5 in *.pod5; do id=$(echo "$file" | grep -oP 'barcode\d+'); dorado duplex sup $pod5 > $id.duplex.bam; pb push "minION: duplex $id finished"; done && \
+for file in *duplex.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtools view  -@ 8 -O fastq -d dx:1 $file | pigz -9 > $id.duplex.fastq.gz; done && \
+for file in *duplex.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtools view  -@ 8 -O fastq -d dx:0 $file | pigz -9 > $id.simplex.fastq.gz; done 
+```
 
 ## Running the pipeline
 
