@@ -560,7 +560,7 @@ process Correction_canu {
     genomeSize=${params.size} \
     ${fast_option} \
     -nanopore ${sampleID}.simplex.fastq.gz \
-    ${mhapPipe}
+    ${task.mhapPipe}
 
     cp ${sampleID}/*correctedReads.fasta.gz ${sampleID}.simplex.corrected.fasta.gz
     cp ${sampleID}/*.report ${sampleID}.simplex.corrected.report
