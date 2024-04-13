@@ -52,7 +52,7 @@ for file in simplex/*.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtoo
 for file in simplex/*readids.txt; do id=$(echo "$file" | grep -oP 'barcode\d+'); grep -v "@" $file > simplex/$id.clean.txt; done && \
 for file in simplex/*clean.txt; do id=$(echo "$file" | grep -oP 'barcode\d+'); pod5 filter -r $location -i $file -t 10 --missing-ok --duplicate-ok --output $id.pod5; done && \
 for file in *.pod5; do id=$(echo "$file" | grep -oP 'barcode\d+'); dorado duplex sup $file > $id.duplex.untrimmed.bam; done && \
-for file in *untrimmed.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); dorado trim $file > $id.duplex.bam && \
+for file in *untrimmed.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); dorado trim $file > $id.duplex.bam; done && \
 rm *untrimmed.bam && \
 for file in *duplex.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtools view  -@ 8 -O fastq -d dx:1 $file | pigz -9 > $id.duplex.fastq.gz; done && \
 for file in *duplex.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtools view  -@ 8 -O fastq -d dx:0 $file | pigz -9 > $id.simplex.fastq.gz; done 
