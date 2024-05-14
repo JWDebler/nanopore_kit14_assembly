@@ -30,10 +30,6 @@ def helpMessage() {
         r1041_e82_400bps_sup_v4.1.0 (kit114, sup, 4 kHz)
         (Default: r1041_e82_400bps_sup_v4.3.0)
 
-    --canuSlow
-        Disables canu fast mode.
-        (Default: false)
-
     --outdir <path>
         The directory to store the results in.
         (Default: `assembly`)
@@ -86,20 +82,6 @@ if ( params.reads ) {
     .tap { ReadsDuplexForQC }
     .tap { ReadsSimplexForQC }
     .view()
-}
-
-process version_canu {
-
-    label "canu"
-
-    output:
-    path 'versions.txt' into canu_version
-
-    """
-    echo canu: >> versions.txt
-    canu --version >> versions.txt
-    echo --------------- >> versions.txt
-    """
 }
 
 
@@ -178,7 +160,6 @@ process version_chopper {
 process versions {
 
     input:
-    path "canu.txt" from canu_version
     path "medaka.txt" from medaka_version
     path "seqkit.txt" from seqkit_version
     path "flye.txt" from flye_version
@@ -192,7 +173,7 @@ process versions {
 
     script:
     """
-    cat canu.txt medaka.txt seqkit.txt flye.txt nextdenovo.txt chopper.txt> versions.txt
+    cat medaka.txt seqkit.txt flye.txt nextdenovo.txt chopper.txt> versions.txt
     """
 }
 
@@ -293,7 +274,7 @@ process QC_nanoplot_Chopper_Duplex {
 
     output:
     path "*.html"
-    tuple sampleID, "reads.fastq.gz" into FilterdForAssemblyDuplex
+    tuple sampleID, "reads.fastq.gz" into DuplexConversion
     
     
     """
@@ -315,13 +296,73 @@ process QC_nanoplot_Chopper_Simplex {
 
     output:
     path "*.html"
-    tuple sampleID, "reads.fastq.gz" into FilterdForAssemblySimplex
+    tuple sampleID, "reads.fastq.gz" into SimplexTrimming
     
     """
     NanoPlot \
     --fastq reads.fastq.gz \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.chopper.simplex.html
+    """
+}
+
+process Convert_Duplex {
+
+    label "seqkit"
+    tag {sampleID}
+
+    input:
+    tuple sampleID, "reads.fastq.gz" from DuplexConversion
+
+    output:
+    tuple sampleID, "${sampleID}.duplex.fasta.gz" into FilterdForAssemblyDuplex
+
+    """
+    seqkit -j ${task.cpus} fq2fa reads.fastq.gz | gzip -9 > ${sampleID}.duplex.fasta.gz
+    """
+}
+
+process Correction_dechat {
+
+    label "dechat"
+    tag {sampleID}
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fa.gz'
+
+    input:
+    tuple sampleID,  "${sampleID}.simplex.fastq.gz" from SimplexTrimming
+
+    output:
+    tuple sampleID,  "${sampleID}.ec.fa" into CompressReads
+
+    script:
+
+    """
+    dechat \
+    -t ${task.cpus} \
+    -o ${sampleID} \
+    -i ${sampleID}.simplex.fastq.gz
+    """
+}
+
+process Compress_corrected_reads { 
+    
+    label "chopper"
+    tag {sampleID}
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fasta.gz'
+
+    input:
+    tuple sampleID,  "${sampleID}.ec.fa" from CompressReads
+
+    output:
+    tuple sampleID,  "${sampleID}.simplex.corrected.dechat.fasta.gz"  into FilterdForAssemblySimplex
+
+    script:
+
+    """
+    pigz -9 \
+    ${sampleID}.ec.fa
+
+    mv ${sampleID}.ec.fa.gz ${sampleID}.simplex.corrected.dechat.fasta.gz
     """
 }
 
@@ -354,15 +395,15 @@ process Assembly_flye {
     publishDir "${params.outdir}/${sampleID}/03-assembly", pattern: '*_flye.*'
 
     input:
-    tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz", "${sampleID}.simplex.chopper.fastq.gz" from FilteredForFlye
+    tuple sampleID, "${sampleID}.duplex.chopper.fasta.gz", "${sampleID}.simplex.chopper.fasta.gz" from FilteredForFlye
 
     output:
     tuple sampleID, "${sampleID}_flye.fasta" into MedakaFlye
-    tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz", "${sampleID}.simplex.chopper.fastq.gz" into FilteredForNextdenovo
+    tuple sampleID, "${sampleID}.duplex.chopper.fasta.gz", "${sampleID}.simplex.chopper.fasta.gz" into FilteredForNextdenovo
     file "${sampleID}_flye.assembly_info.txt"
     """
      flye \
-    --nano-hq ${sampleID}.duplex.chopper.fastq.gz ${sampleID}.simplex.chopper.fastq.gz \
+    --nano-hq ${sampleID}.duplex.chopper.fasta.gz ${sampleID}.simplex.chopper.fasta.gz \
     --read-error 0.03 \
     --genome-size ${params.size} \
     --asm-coverage 50 \
@@ -382,15 +423,14 @@ process Assembly_nextdenovo {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*corredted.fasta'
 
     input:
-    tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" from FilteredForNextdenovo
+    tuple sampleID, "duplex.fasta.gz", "simplex.fasta.gz" from FilteredForNextdenovo
 
     output:
     tuple sampleID, "${sampleID}_nextdenovo.fasta" into MedakaNextdenovo
     tuple sampleID, "${sampleID}.nextdenovo.corredted.fasta"
-    tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" into ReadsForCorrection
 
     """
-    ls duplex.fastq.gz simplex.fastq.gz > ${sampleID}.fofn
+    ls duplex.fasta.gz simplex.fasta.gz > ${sampleID}.fofn
 
     echo '''
     [General]
@@ -489,7 +529,7 @@ process Cleanup_seqkitFlye {
 
     """
     seqkit sort -lr ${sampleID}_flye_medaka.unsorted.fasta > ${sampleID}_flye_medaka.sorted.fasta
-    seqkit replace -p '.+' -r 'flye_ctg_{nr}' --nr-width 2 ${sampleID}_flye_medaka.sorted.fasta > ${sampleID}_flye_medaka.fasta
+    seqkit replace -p '.+' -r '${sampleID}_ctg_{nr}' --nr-width 2 ${sampleID}_flye_medaka.sorted.fasta > ${sampleID}_flye_medaka.fasta
     """
 }
 
@@ -508,7 +548,7 @@ process Cleanup_seqkitNextdenovo {
 
     """
     seqkit sort -lr ${sampleID}_nextdenovo_medaka.unsorted.fasta > ${sampleID}_nextdenovo_medaka.sorted.fasta
-    seqkit replace -p '.+' -r 'nd_ctg_{nr}' --nr-width 2 ${sampleID}_nextdenovo_medaka.sorted.fasta > ${sampleID}_nextdenovo_medaka.fasta
+    seqkit replace -p '.+' -r '${sampleID}_ctg_{nr}' --nr-width 2 ${sampleID}_nextdenovo_medaka.sorted.fasta > ${sampleID}_nextdenovo_medaka.fasta
     """
 }
 
@@ -530,39 +570,5 @@ process Cleanup_ragtag {
     """
     ragtag.py scaffold nextdenovo.fasta flye.fasta
     cp ragtag_output/* .
-    """
-}
-
-// read correction
-process Correction_canu {
-
-    label "canu"
-    tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fasta.gz'
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.report'
-
-    input:
-    tuple sampleID,  "duplex.fastq.gz", "${sampleID}.simplex.fastq.gz" from ReadsForCorrection
-
-    output:
-    path "${sampleID}.simplex.corrected.fasta.gz"
-    path "${sampleID}.simplex.corrected.report"
-
-    script:
-    // See: https://groovy-lang.org/operators.html#_elvis_operator
-    fast_option = params.canuSlow ? "" : "-fast "
-
-    """
-    canu \
-    -correct \
-    -p ${sampleID} \
-    -d ${sampleID} \
-    genomeSize=${params.size} \
-    ${fast_option} \
-    -nanopore ${sampleID}.simplex.fastq.gz \
-    ${params.mhapPipe}
-
-    cp ${sampleID}/*correctedReads.fasta.gz ${sampleID}.simplex.corrected.fasta.gz
-    cp ${sampleID}/*.report ${sampleID}.simplex.corrected.report
     """
 }
