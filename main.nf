@@ -359,10 +359,9 @@ process Compress_corrected_reads {
     script:
 
     """
-    pigz -9 \
-    ${sampleID}.ec.fa
-
-    mv ${sampleID}.ec.fa.gz ${sampleID}.simplex.corrected.dechat.fasta.gz
+    cp ${sampleID}.ec.fa test
+    pigz -9 -c test > ${sampleID}.simplex.corrected.dechat.fasta.gz
+    rm test
     """
 }
 
