@@ -26,7 +26,7 @@ def helpMessage() {
     --medakaModel <glob>
         not required
         Which basecaller model was used?
-        r1041_e82_400bps_sup_v4.2.0 (kit114, sup, 5 kHz)
+        r1041_e82_400bps_sup_v4.3.0 (kit114, sup, 5 kHz)
         r1041_e82_400bps_sup_v4.1.0 (kit114, sup, 4 kHz)
         (Default: r1041_e82_400bps_sup_v4.3.0)
 
@@ -52,7 +52,7 @@ def helpMessage() {
 
 params.reads=""
 params.size="42m"
-params.medakaModel="r1041_e82_400bps_sup_v4.3.0"
+params.medakaModel="r1041_e82_400bps_sup_v5.0.0"
 params.minlen="1000"
 params.quality="10"
 
@@ -196,8 +196,9 @@ process QC_chopper_Duplex {
 
     """
     wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
-    seqkit rmdup -n duplex.fastq.gz | chopper -t ${task.cpus} --contam DCS.fasta -q ${params.quality} -l 200 | pigz -9 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz 
-    zcat ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -t ${task.cpus} -l ${params.minlen} | pigz -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
+    minimap2 -d dcs.mmi DCS.fasta
+    seqkit rmdup -n duplex.fastq.gz | minimap2 -t "${task.cpus}" -ax lr:hq dcs.mmi - | samtools view -O fastq -@ "${task.cpus}" - | chopper -t ${task.cpus}  -q ${params.quality} -l 200 | pigz -9 > ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz 
+    chopper -i ${sampleID}.duplex.chopper.200bp.q${params.quality}.fastq.gz -t ${task.cpus} -l ${params.minlen} | pigz -9 > ${sampleID}.duplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
     """
 }
 
@@ -216,8 +217,9 @@ process QC_chopper_Simplex {
     
     """
     wget https://raw.githubusercontent.com/JWDebler/nanopore_kit14_assembly/main/data/DCS.fasta
-    seqkit rmdup -n simplex.fastq.gz | chopper -t ${task.cpus} --contam DCS.fasta -q ${params.quality} -l 200 | pigz -9 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz
-    zcat ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz | chopper -t ${task.cpus} -l ${params.minlen} -q ${params.quality}| pigz -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
+    minimap2 -d dcs.mmi DCS.fasta
+    seqkit rmdup -n simplex.fastq.gz | minimap2 -t "${task.cpus}" -ax lr:hq dcs.mmi - | samtools view -O fastq -@ "${task.cpus}" - | chopper -t ${task.cpus}  -q ${params.quality} -l 200 | pigz -9 > ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz 
+    chopper -i ${sampleID}.simplex.chopper.200bp.q${params.quality}.fastq.gz -t ${task.cpus} -l ${params.minlen} | pigz -9 > ${sampleID}.simplex.chopper.${params.minlen}bp.q${params.quality}.fastq.gz
     """
 }
 
@@ -241,7 +243,6 @@ process QC_nanoplot_Raw_Duplex {
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.duplex.html
     """
 }
-
 process QC_nanoplot_Raw_Simplex {
 
     label "nanoplot"
@@ -274,7 +275,7 @@ process QC_nanoplot_Chopper_Duplex {
 
     output:
     path "*.html"
-    tuple sampleID, "reads.fastq.gz" into DuplexConversion
+    tuple sampleID, "reads.fastq.gz" into FilterdForAssemblyDuplex
     
     
     """
@@ -296,72 +297,13 @@ process QC_nanoplot_Chopper_Simplex {
 
     output:
     path "*.html"
-    tuple sampleID, "reads.fastq.gz" into SimplexTrimming
+    tuple sampleID, "reads.fastq.gz" into FilterdForAssemblySimplex
     
     """
     NanoPlot \
     --fastq reads.fastq.gz \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.chopper.simplex.html
-    """
-}
-
-process Convert_Duplex {
-
-    label "seqkit"
-    tag {sampleID}
-
-    input:
-    tuple sampleID, "reads.fastq.gz" from DuplexConversion
-
-    output:
-    tuple sampleID, "${sampleID}.duplex.fasta.gz" into FilterdForAssemblyDuplex
-
-    """
-    seqkit -j ${task.cpus} fq2fa reads.fastq.gz | gzip -9 > ${sampleID}.duplex.fasta.gz
-    """
-}
-
-process Correction_dechat {
-
-    label "dechat"
-    tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fa.gz'
-
-    input:
-    tuple sampleID,  "${sampleID}.simplex.fastq.gz" from SimplexTrimming
-
-    output:
-    tuple sampleID,  "${sampleID}.ec.fa" into CompressReads
-
-    script:
-
-    """
-    dechat \
-    -t ${task.cpus} \
-    -o ${sampleID} \
-    -i ${sampleID}.simplex.fastq.gz
-    """
-}
-
-process Compress_corrected_reads { 
-    
-    label "chopper"
-    tag {sampleID}
-    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fasta.gz'
-
-    input:
-    tuple sampleID,  "${sampleID}.ec.fa" from CompressReads
-
-    output:
-    tuple sampleID,  "${sampleID}.simplex.corrected.dechat.fasta.gz"  into FilterdForAssemblySimplex
-
-    script:
-
-    """
-    cp ${sampleID}.ec.fa test
-    pigz -9 -c test > ${sampleID}.simplex.corrected.dechat.fasta.gz
-    rm test
     """
 }
 
@@ -394,15 +336,15 @@ process Assembly_flye {
     publishDir "${params.outdir}/${sampleID}/03-assembly", pattern: '*_flye.*'
 
     input:
-    tuple sampleID, "${sampleID}.duplex.chopper.fasta.gz", "${sampleID}.simplex.chopper.fasta.gz" from FilteredForFlye
+    tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz", "${sampleID}.simplex.chopper.fastq.gz" from FilteredForFlye
 
     output:
     tuple sampleID, "${sampleID}_flye.fasta" into MedakaFlye
-    tuple sampleID, "${sampleID}.duplex.chopper.fasta.gz", "${sampleID}.simplex.chopper.fasta.gz" into FilteredForNextdenovo
+    tuple sampleID, "${sampleID}.duplex.chopper.fastq.gz", "${sampleID}.simplex.chopper.fastq.gz" into FilteredForNextdenovo
     file "${sampleID}_flye.assembly_info.txt"
     """
      flye \
-    --nano-hq ${sampleID}.duplex.chopper.fasta.gz ${sampleID}.simplex.chopper.fasta.gz \
+    --nano-hq ${sampleID}.duplex.chopper.fastq.gz ${sampleID}.simplex.chopper.fastq.gz \
     --read-error 0.03 \
     --genome-size ${params.size} \
     --asm-coverage 50 \
@@ -422,14 +364,15 @@ process Assembly_nextdenovo {
     publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*corredted.fasta'
 
     input:
-    tuple sampleID, "duplex.fasta.gz", "simplex.fasta.gz" from FilteredForNextdenovo
+    tuple sampleID, "duplex.fastq.gz", "simplex.fastq.gz" from FilteredForNextdenovo
 
     output:
-    tuple sampleID, "${sampleID}_nextdenovo.fasta" into MedakaNextdenovo
+    tuple sampleID, "${sampleID}_nextdenovo.fasta", "simplex.fastq.gz" into MedakaNextdenovo
     tuple sampleID, "${sampleID}.nextdenovo.corredted.fasta"
+    
 
     """
-    ls duplex.fasta.gz simplex.fasta.gz > ${sampleID}.fofn
+    ls duplex.fastq.gz simplex.fastq.gz > ${sampleID}.fofn
 
     echo '''
     [General]
@@ -496,10 +439,11 @@ process Polishing_medaka_nextdenovo {
     tag {sampleID}
 
     input:
-    tuple sampleID, "nextdenovo.fasta", "mergedReads.fastq.gz"  from MedakaNextdenovo.join(MergedFilteredForMedakaNextdenovo)
+    tuple sampleID, "nextdenovo.fasta", "simplex.fastq.gz", "mergedReads.fastq.gz"  from MedakaNextdenovo.join(MergedFilteredForMedakaNextdenovo)
 
     output:
     tuple sampleID, "${sampleID}_nextenovo_medaka.fasta" into SeqkitNextdenovo
+    tuple sampleID, "simplex.fastq.gz" into Correction_dechat
 
     """
     medaka_consensus \
@@ -569,5 +513,31 @@ process Cleanup_ragtag {
     """
     ragtag.py scaffold nextdenovo.fasta flye.fasta
     cp ragtag_output/* .
+    """
+}
+
+process Correction_dechat {
+
+    label "dechat"
+    tag {sampleID}
+    publishDir "${params.outdir}/${sampleID}/02-processed-reads", pattern: '*.fasta.gz'
+
+    input:
+    tuple sampleID,  "${sampleID}.simplex.fastq.gz" from Correction_dechat
+
+    output:
+    tuple sampleID,  "${sampleID}.corrected.dechat.fasta.gz" 
+
+    script:
+
+    """
+    dechat \
+    -t ${task.cpus} \
+    -o ${sampleID} \
+    -i ${sampleID}.simplex.fastq.gz
+
+    pigz -9 ${sampleID}.ec.fa
+
+    mv ${sampleID}.ec.fa ${sampleID}.corrected.dechat.fasta.gz
     """
 }
