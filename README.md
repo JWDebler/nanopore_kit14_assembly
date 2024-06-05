@@ -4,7 +4,7 @@
   - [Input](#input)
     - [Basecall with Dorado (non barcoded samples):](#basecall-with-dorado-non-barcoded-samples)
       - [Seperate simplex and duplex reads](#seperate-simplex-and-duplex-reads)
-    - [Basecall with Dorado (barcoded samples as of Dorado 0.5.3)](#basecall-with-dorado-barcoded-samples-as-of-dorado-053)
+    - [Basecall with Dorado (barcoded samples as of Dorado 0.7.1)](#basecall-with-dorado-barcoded-samples-as-of-dorado-071)
   - [Running the pipeline](#running-the-pipeline)
   - [Profiles](#profiles)
   - [Parameters](#parameters)
@@ -38,25 +38,14 @@ samtools view -O fastq -d dx:0 sampleID.dorado.bam |  gzip -9 >  sampleID.simple
 samtools view -O fastq -d dx:1 sampleID.dorado.bam |  gzip -9 >  sampleID.duplex.fastq.gz
 ```
 
-### Basecall with Dorado (barcoded samples as of Dorado 0.5.3)
-As of version 0.5.3 Dorado can not yet do duplex calling and barcode demultiplexing in one go. The current workaround is to first call the reads in simplex and classification of barcodes, and then to extract a list of reads per barcode. Then you call the data again only using a subset of the already classified reads.
+### Basecall with Dorado (barcoded samples as of Dorado 0.7.1)
+As of version 0.7.1 Dorado can not yet do duplex calling and barcode demultiplexing in one go. The current workaround is to first call the reads in simplex and classification of barcodes, and then to extract a list of reads per barcode. Then you call the data again only using a subset of the already classified reads.
 The commands below also demultiplex the pod5 files into individual files per barcode. For this [pod5 tools](https://github.com/nanoporetech/pod5-file-format) need to be installed.
 
-```
-location=/path/to/raw/data/containing/folder
-
-dorado basecaller sup -r $location --kit-name SQK-NBD114-24 > all.bam && \
-dorado demux --output-dir simplex --no-classify all.bam && \
-rm simplex/*unclassified* && \
-for file in simplex/*.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtools view -h $file | cut -f 1 > simplex/$id.readids.txt; done && \
-for file in simplex/*readids.txt; do id=$(echo "$file" | grep -oP 'barcode\d+'); grep -v "@" $file > simplex/$id.clean.txt; done && \
-for file in simplex/*clean.txt; do id=$(echo "$file" | grep -oP 'barcode\d+'); pod5 filter -r $location -i $file -t 10 --missing-ok --duplicate-ok --output $id.pod5; done && \
-for file in *.pod5; do id=$(echo "$file" | grep -oP 'barcode\d+'); dorado duplex sup $file > $id.duplex.untrimmed.bam; done && \
-for file in *untrimmed.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); dorado trim $file > $id.duplex.bam; done && \
-rm *untrimmed.bam && \
-for file in *duplex.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtools view  -@ 8 -O fastq -d dx:1 $file | pigz -9 > $id.duplex.fastq.gz; done && \
-for file in *duplex.bam; do id=$(echo "$file" | grep -oP 'barcode\d+'); samtools view  -@ 8 -O fastq -d dx:0 $file | pigz -9 > $id.simplex.fastq.gz; done 
-```
+Use the `basecalling.sh` script to demultiplex and duplex call a folder of pod5 files. Your output will be a folder of demultiplexed and separated by channel pod5 files. Separating by channel significantly speeds up duplex calling.
+The final output are three files per barcode called `barcodeX.duplex.fastq.gz`, `barcodeX.simplex.fastq.gz` and `barcodeX.simplex.corrected.fasta.gz`.
+The two `fastq.gz` files are going to be the input files for this assembly pipeline. You can use the `corrected.fasta.gz` file for mapping back to your draft assembly and manually fixing it.
+At this point I am using the 'raw' files as imput for the assemblers, this might change in the future. 
 
 ## Running the pipeline
 
@@ -118,3 +107,4 @@ If the pipeline gets stopped or crashes during the medaka steps there is a chanc
 [a4/0cfae1] process > Assembly_nextdenovo
 
 Go to the folders `work/bc/a53374...` and delete the `*.fai` and `*.mmi` files. After that resume the pipeline and it will run medaka properly.
+

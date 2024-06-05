@@ -26,7 +26,7 @@ def helpMessage() {
     --medakaModel <glob>
         not required
         Which basecaller model was used?
-        r1041_e82_400bps_sup_v4.3.0 (kit114, sup, 5 kHz)
+        r1041_e82_400bps_sup_v5.0.0 (kit114, sup, 5 kHz)
         r1041_e82_400bps_sup_v4.1.0 (kit114, sup, 4 kHz)
         (Default: r1041_e82_400bps_sup_v4.3.0)
 
