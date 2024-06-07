@@ -231,14 +231,14 @@ process QC_nanoplot_Raw_Duplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsDuplexForQC
+    tuple sampleID, "${sampleID}.duplex.fastq.gz", "${sampleID}.simplex.fastq.gz" from ReadsDuplexForQC
 
     output:
     path "*.html"
     
     """
     NanoPlot \
-    --fastq duplex.fastq.gz \
+    --fastq ${sampleID}.duplex.fastq.gz \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.duplex.html
     """
@@ -250,7 +250,7 @@ process QC_nanoplot_Raw_Simplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
-    tuple sampleID, 'duplex.fastq.gz', 'simplex.fastq.gz' from ReadsSimplexForQC
+    tuple sampleID, "${sampleID}.duplex.fastq.gz", "${sampleID}.simplex.fastq.gz" from ReadsSimplexForQC
 
     output:
     path "*.html"
@@ -258,7 +258,7 @@ process QC_nanoplot_Raw_Simplex {
     
     """
     NanoPlot \
-    --fastq simplex.fastq.gz \
+    --fastq ${sampleID}.simplex.fastq.gz \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.simplex.html
     """
@@ -271,16 +271,16 @@ process QC_nanoplot_Chopper_Duplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
-    tuple sampleID, 'reads.fastq.gz' from FilteredDuplex1000
+    tuple sampleID, "${sampleID}.duplex.fastq.gz" from FilteredDuplex1000
 
     output:
     path "*.html"
-    tuple sampleID, "reads.fastq.gz" into FilterdForAssemblyDuplex
+    tuple sampleID, "${sampleID}.duplex.fastq.gz" into FilterdForAssemblyDuplex
     
     
     """
     NanoPlot \
-    --fastq reads.fastq.gz \
+    --fastq ${sampleID}.duplex.fastq.gz \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.chopper.duplex.html
     """
@@ -293,15 +293,15 @@ process QC_nanoplot_Chopper_Simplex {
     publishDir "${params.outdir}/${sampleID}/01-QC", pattern: '*.html'
 
     input:
-    tuple sampleID, 'reads.fastq.gz' from FilteredSimplex1000
+    tuple sampleID, "${sampleID}.simplex.fastq.gz" from FilteredSimplex1000
 
     output:
     path "*.html"
-    tuple sampleID, "reads.fastq.gz" into FilterdForAssemblySimplex
+    tuple sampleID, "${sampleID}.simplex.fastq.gz" into FilterdForAssemblySimplex
     
     """
     NanoPlot \
-    --fastq reads.fastq.gz \
+    --fastq ${sampleID}.simplex.fastq.gz \
     -o output && \
     cp output/NanoPlot-report.html ${sampleID}.nanoplot.chopper.simplex.html
     """
@@ -538,6 +538,6 @@ process Correction_dechat {
 
     pigz -9 ${sampleID}.ec.fa
 
-    mv ${sampleID}.ec.fa ${sampleID}.corrected.dechat.fasta.gz
+    mv ${sampleID}.ec.fa.gz ${sampleID}.corrected.dechat.fasta.gz
     """
 }

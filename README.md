@@ -2,9 +2,10 @@
 
 - [Nanopore assembly pipeline for kit 14 duplex called reads](#nanopore-assembly-pipeline-for-kit-14-duplex-called-reads)
   - [Input](#input)
-    - [Basecall with Dorado (non barcoded samples):](#basecall-with-dorado-non-barcoded-samples)
+    - [Basecall with Dorado - non barcoded samples:](#basecall-with-dorado---non-barcoded-samples)
+      - [Trimming with dorado](#trimming-with-dorado)
       - [Seperate simplex and duplex reads](#seperate-simplex-and-duplex-reads)
-    - [Basecall with Dorado (barcoded samples as of Dorado 0.7.1)](#basecall-with-dorado-barcoded-samples-as-of-dorado-071)
+    - [Basecall with Dorado - barcoded samples (Dorado 0.7.1)](#basecall-with-dorado---barcoded-samples-dorado-071)
   - [Running the pipeline](#running-the-pipeline)
   - [Profiles](#profiles)
   - [Parameters](#parameters)
@@ -24,23 +25,31 @@ Currently this pipeline is optimised to run on a Nimbus instance with 16 cores a
 
 The pipeline requires you to basecall your raw fast5 or pod5 files with dorado and then split the reads into simplex and duplex.
 
-### Basecall with Dorado (non barcoded samples):
+### Basecall with Dorado - non barcoded samples:
 
 ```
-dorado duplex sup pod5s/ -r > sampleID.dorado.bam
+pod5 view folder_with_pod5_files/*.pod5 -t $(nproc) --include "read_id, channel" --output channel.summary.tsv
+pod5 subset folder_with_pod5_files/ -t $(nproc) --summary channel.summary.tsv --columns channel --output pod5_by_channel/ 
+dorado duplex sup pod5_by_channel/  > sampleID.dorado.untrimmed.bam
+```
+
+#### Trimming with dorado
+
+```
+dorado trim -t $(nproc) sampleID.dorado.untrimmed.bam >  sampleID.dorado.trimmed.bam
 ```
 #### Seperate simplex and duplex reads
 
 Dorado generates a BAM file containing both the simplex and duplex reads. The respective reads can be extracted from that BAM file using samtools.
 
 ```
-samtools view -O fastq -d dx:0 sampleID.dorado.bam |  gzip -9 >  sampleID.simplex.fastq.gz && \
-samtools view -O fastq -d dx:1 sampleID.dorado.bam |  gzip -9 >  sampleID.duplex.fastq.gz
+samtools view -O fastq -d dx:0 sampleID.dorado.trimmed.bam |  gzip -9 >  sampleID.simplex.fastq.gz && \
+samtools view -O fastq -d dx:1 sampleID.dorado.trimmed.bam |  gzip -9 >  sampleID.duplex.fastq.gz
 ```
 
-### Basecall with Dorado (barcoded samples as of Dorado 0.7.1)
-As of version 0.7.1 Dorado can not yet do duplex calling and barcode demultiplexing in one go. The current workaround is to first call the reads in simplex and classification of barcodes, and then to extract a list of reads per barcode. Then you call the data again only using a subset of the already classified reads.
-The commands below also demultiplex the pod5 files into individual files per barcode. For this [pod5 tools](https://github.com/nanoporetech/pod5-file-format) need to be installed.
+### Basecall with Dorado - barcoded samples (Dorado 0.7.1)
+As of version 0.7.1 Dorado can not yet do duplex calling and barcode demultiplexing in one go. The current workaround is to first call the reads in simplex mode and do classification of barcodes, and then to extract a list of reads per barcode. Then you call the data again only using a subset of the already classified reads.
+The script below also demultiplexes the pod5 files into individual files per barcode and then into individual channels. For this [pod5 tools](https://github.com/nanoporetech/pod5-file-format) need to be installed.
 
 Use the `basecalling.sh` script to demultiplex and duplex call a folder of pod5 files. Your output will be a folder of demultiplexed and separated by channel pod5 files. Separating by channel significantly speeds up duplex calling.
 The final output are three files per barcode called `barcodeX.duplex.fastq.gz`, `barcodeX.simplex.fastq.gz` and `barcodeX.simplex.corrected.fasta.gz`.
@@ -64,7 +73,7 @@ nextflow run jwdebler/nanopore_kit14_assembly -resume -latest -profile docker,so
 
 We have a few profiles available to customise how the pipeline will run.
 
-- `nimbus` sets the canu assembler to use 15 CPUs and 60GB RAM.
+- `nimbus` sets parameters for a Nimbus cloud instance with 16 cores and 64 Gb of RAM.
 - `solo` sets paramaters to run on the lab computer running the P2 Solo sequencer.
 - `docker` and `docker_sudo` sets it to use docker containers, `docker_sudo` is identical except that docker is run as root (required for some installations of docker).
 
@@ -82,7 +91,7 @@ We have a few profiles available to customise how the pipeline will run.
     Used by the assemblers to calculate read coverage
 
 --medakaModel <glob>
-    Default: r1041_e82_400bps_sup_v4.3.0 (kit 14, sup, 5 kHz)
+    Default: r1041_e82_400bps_sup_v5.0.0 (kit 14, sup, 5 kHz)
     The model that was used during basecalling.
     r1041_e82_400bps_sup_v4.1.0 (kit 14, sup, 4 kHz)
     r941_min_sup_g507 (LSK109, sup, 4kHz)
