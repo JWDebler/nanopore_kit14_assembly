@@ -63,7 +63,7 @@ if (params.help) {
 
 if ( params.reads ) {
     nanoporeReads = Channel
-    .fromFilePairs(params.reads + "*{sim,du}plex.fastq.gz")
+    .fromFilePairs(params.reads + "*{sim,du}plex.fast*")
     .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
     .map { sampleID -> [sampleID[0]] + sampleID[1] }
     .tap { ReadsDuplexForChopper }
@@ -74,7 +74,7 @@ if ( params.reads ) {
 
 } else {
     nanoporeReads = Channel
-    .fromFilePairs("*{sim,du}plex.fastq.gz")
+    .fromFilePairs("*{sim,du}plex.fast*")
     .map { sampleID, reads -> [sampleID.tokenize('.')[0], reads] }
     .map { sampleID -> [sampleID[0]] + sampleID[1] }
     .tap { ReadsDuplexForChopper }
