@@ -40,7 +40,7 @@ def helpMessage() {
 
     --quality
         Min read q-score to keep for read filtering
-        (Default: 10)
+        (Default: 8)
 
     ## Exit codes
     - 0: All ok.
@@ -54,7 +54,7 @@ params.reads=""
 params.size="42m"
 params.medakaModel="r1041_e82_400bps_sup_v5.0.0"
 params.minlen="1000"
-params.quality="10"
+params.quality="8"
 
 if (params.help) {
     helpMessage()

@@ -14,7 +14,7 @@
 # barcoding kit used:
 kit_name="SQK-NBD114-24" 
 # quality filtering
-quality="10"
+# quality="10"
 #############################################
 
 
@@ -69,7 +69,7 @@ echo "==========================================================================
 echo "$(date) - Starting SUP basecalling"
 echo "============================================================================"
 
-dorado basecaller sup -r $path_input --min-qscore $quality --kit-name $kit_name > $path_output/all.bam 
+dorado basecaller sup -r $path_input --kit-name $kit_name > $path_output/all.bam 
 
 echo "============================================================================"
 echo "$(date) - Extracting split reads"
@@ -155,7 +155,7 @@ for folder in $path_output/pod5_by_barcode/*;
   echo "============================================================================";
   echo "$(date) - Duplex calling $id";
   echo "============================================================================";
-  dorado duplex sup -r $folder --min-qscore $quality > $path_output/duplex/$id.duplex.untrimmed.bam; 
+  dorado duplex sup -r $folder > $path_output/duplex/$id.duplex.untrimmed.bam; 
   done
 
 echo "============================================================================"
