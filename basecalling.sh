@@ -14,7 +14,7 @@
 # barcoding kit used:
 kit_name="SQK-NBD114-24" 
 # quality filtering
-# quality="10"
+# quality="10" x
 #############################################
 
 
