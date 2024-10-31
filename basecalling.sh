@@ -13,8 +13,8 @@
 # Change these if needed
 # barcoding kit used:
 kit_name="SQK-NBD114-24" 
-# quality filtering
-# quality="10" x
+# quality filtering, currently disabled, you can always filter later using chopper
+# quality="10" 
 #############################################
 
 
@@ -69,7 +69,7 @@ echo "==========================================================================
 echo "$(date) - Starting SUP basecalling"
 echo "============================================================================"
 
-dorado basecaller sup -r $path_input --kit-name $kit_name > $path_output/all.bam 
+dorado basecaller hac -r $path_input --kit-name $kit_name > $path_output/all.bam 
 
 echo "============================================================================"
 echo "$(date) - Extracting split reads"
@@ -83,8 +83,8 @@ echo "==========================================================================
 
 dorado demux -t $(nproc) --output-dir $path_output/simplex --no-classify $path_output/all.bam
 dorado demux -t $(nproc) --output-dir $path_output/split_reads --no-classify $path_output/splitreads.bam
-rm $path_output/simplex/unclassified.bam
-rm $path_output/split_reads/unclassified.bam
+rm $path_output/simplex/*unclassified.bam
+rm $path_output/split_reads/*unclassified.bam
 
 for file in $path_output/split_reads/*.bam;
   do
@@ -177,13 +177,7 @@ echo "==========================================================================
 for file in $path_output/duplex/*duplex.untrimmed.bam; 
   do 
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  samtools view -@ $(nproc) -h $file | fgrep -w dx:i:0 | cut -f 1 > $path_output/simplex/tmp/$id.trimmed.simplex.ids.txt; 
-  done
-
-for file in $path_output/simplex/tmp/*.trimmed.simplex.ids.txt; 
-  do 
-  id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  samtools view -h -@ $(nproc) $path_output/all.bam | fgrep -w -f $path_output/simplex/tmp/$id.trimmed.simplex.ids.txt | samtools view -h -@ $(nproc) -O fastq -  >  $path_output/simplex/tmp/$id.simplex.untrimmed.fastq; 
+  samtools view -@ $(nproc) -h -O fastq -d dx:0 $file > $path_output/simplex/tmp/$id.simplex.untrimmed.fastq; 
   done
 
 echo "============================================================================"
@@ -212,7 +206,7 @@ for file in $path_output/duplex/tmp/*duplex.untrimmed.fastq;
   dorado trim -t $(nproc) --emit-fastq $file | pigz -9 >  $path_output/$id.duplex.fastq.gz
   done
 
-for file in $path_output/simplex/tmp/*simplex.untrimmed.fastq;
+for file in $path_output/simplex/*simplex.untrimmed.fastq;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
   dorado trim -t $(nproc) --emit-fastq $file >  $path_output/$id.simplex.fastq
