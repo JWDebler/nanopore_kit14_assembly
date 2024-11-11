@@ -66,7 +66,7 @@ if [ ! -d $path_output ]; then
 fi
 
 echo "============================================================================"
-echo "$(date) - Starting SUP basecalling"
+echo "$(date) - Starting HAC basecalling"
 echo "============================================================================"
 
 dorado basecaller hac -r $path_input --kit-name $kit_name > $path_output/all.bam 
@@ -89,7 +89,7 @@ rm $path_output/split_reads/*unclassified.bam
 for file in $path_output/split_reads/*.bam;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  samtools view -@ $(nproc) -h -O fastq $file >  $path_output/split_reads/$id.simplex.untrimmed.fastq;
+  samtools view -@ $(nproc) -h -O fastq $file >>  $path_output/split_reads/$id.simplex.untrimmed.fastq;
   done
 
 echo "============================================================================"
@@ -101,7 +101,7 @@ mkdir $path_output/simplex/tmp
 for file in $path_output/simplex/*.bam; 
   do 
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  samtools view -@ $(nproc) -h $file | cut -f 1 > $path_output/simplex/tmp/$id.readids.txt; 
+  samtools view -@ $(nproc) -h $file | cut -f 1 >> $path_output/simplex/tmp/$id.readids.txt; 
   done
 
 for file in $path_output/simplex/tmp/*readids.txt; 

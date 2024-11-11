@@ -51,7 +51,7 @@ samtools view -O fastq -d dx:1 sampleID.dorado.trimmed.bam |  gzip -9 >  sampleI
 As of version 0.7.1 Dorado can not yet do duplex calling and barcode demultiplexing in one go. The current workaround is to first call the reads in simplex mode and do classification of barcodes, and then to extract a list of reads per barcode. Then you call the data again only using a subset of the already classified reads.
 The script below also demultiplexes the pod5 files into individual files per barcode and then into individual channels. For this [pod5 tools](https://github.com/nanoporetech/pod5-file-format) need to be installed.
 
-Use the `basecalling.sh` script to demultiplex and duplex call a folder of pod5 files. Your output will be a folder of demultiplexed and separated by channel pod5 files. Separating by channel significantly speeds up duplex calling.
+Use the `basecalling.sh` script to demultiplex and duplex call a folder of pod5 files. Your output will be a folder of pod5 files demultiplexed and separated by channel. Separating by channel significantly speeds up duplex calling.
 The final output are three files per barcode called `barcodeX.duplex.fastq.gz`, `barcodeX.simplex.fastq.gz` and `barcodeX.simplex.corrected.fasta.gz`.
 The two `fastq.gz` files are going to be the input files for this assembly pipeline. You can use the `corrected.fasta.gz` file for mapping back to your draft assembly and manually fixing it.
 At this point I am using the 'raw' files as imput for the assemblers, this might change in the future. 
