@@ -8,6 +8,7 @@
 # - pod5 tools (https://github.com/nanoporetech/pod5-file-format)
 # - samtools (sudo apt install samtools)
 # - pigz (sudo apt install pigz)
+# - chopper (https://github.com/wdecoster/chopper)
 #############################################
 #
 # Change these if needed
@@ -31,7 +32,7 @@ command_exists() {
 }
 
 # Check if required commands are installed
-required_commands=("dorado" "samtools" "pod5" "pigz")
+required_commands=("dorado" "samtools" "pod5" "pigz" "chopper")
 missing_commands=()
 for cmd in "${required_commands[@]}"; do
     if ! command_exists "$cmd"; then
@@ -200,16 +201,21 @@ echo "==========================================================================
 echo "$(date) - Trimming All Reads"
 echo "============================================================================"
 
+# Had to revert to hard trimming with chopper because 'dorado trim' just lets too many reads with adapter 
+# and barcode sequences through and they mess with my assemblies. This might change in the future.
+
 for file in $path_output/duplex/tmp/*duplex.untrimmed.fastq;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  dorado trim -t $(nproc) --emit-fastq $file | pigz -9 >  $path_output/$id.duplex.fastq.gz
+  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file | pigz -9 > $path_output/$id.duplex.fastq.gz && \
+  #dorado trim -t $(nproc) --emit-fastq $file | pigz -9 >  $path_output/$id.duplex.fastq.gz
   done
 
 for file in $path_output/simplex/*simplex.untrimmed.fastq;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  dorado trim -t $(nproc) --emit-fastq $file >  $path_output/$id.simplex.fastq
+  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file > $path_output/$id.simplex.fastq && \
+  #dorado trim -t $(nproc) --emit-fastq $file >  $path_output/$id.simplex.fastq
   done
 
 echo "============================================================================"
