@@ -207,14 +207,14 @@ echo "==========================================================================
 for file in $path_output/duplex/tmp/*duplex.untrimmed.fastq;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file | pigz -9 > $path_output/$id.duplex.fastq.gz && \
+  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file | pigz -9 > $path_output/$id.duplex.fastq.gz 
   #dorado trim -t $(nproc) --emit-fastq $file | pigz -9 >  $path_output/$id.duplex.fastq.gz
   done
 
 for file in $path_output/simplex/*simplex.untrimmed.fastq;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file > $path_output/$id.simplex.fastq && \
+  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file > $path_output/$id.simplex.fastq 
   #dorado trim -t $(nproc) --emit-fastq $file >  $path_output/$id.simplex.fastq
   done
 
