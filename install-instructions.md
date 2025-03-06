@@ -4,7 +4,7 @@ This guide provides step-by-step instructions to install **Conda, Mamba, Dorado*
 
 ---
 
-## **:one: nstall Conda (Miniconda)**
+## **:one: Install Conda (Miniconda)**
 Miniconda is a lightweight version of Anaconda that includes only Conda.
 
 ### **For Linux/macOS:**
@@ -52,7 +52,7 @@ Mamba is a fast, drop-in replacement for Conda.
 
 ---
 
-## ** :three: Install Dorado**
+## **:three: Install Dorado**
 Dorado is an Oxford Nanopore basecalling tool.
 
 1. **Download Dorado**:
@@ -75,7 +75,7 @@ Dorado is an Oxford Nanopore basecalling tool.
 
 ---
 
-## ** :four: reate and Activate the Conda Environment**
+## **:four: Create and Activate the Conda Environment**
 We will now set up a **Conda environment** using Mamba.
 
 ### **Create the environment**
