@@ -1,0 +1,14 @@
+name: basecalling
+channels:
+  - bioconda
+  - conda-forge
+  - jannessp
+  - defaults
+dependencies:
+  - bioconda::samtools=1.21
+  - jannessp::pod5=0.3.23
+  - bioconda::chopper=0.9.1
+  - conda-forge::pigz=2.8
+  - pip
+variables:
+  PATH: "/opt/dorado:$PATH"
