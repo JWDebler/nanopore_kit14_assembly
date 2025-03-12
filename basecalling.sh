@@ -2,7 +2,8 @@
 
 #############################################
 # This script is meant to duplex basecall a folder of multiplexed pod5 files and separate the raw data by barcode and channel.
-# The output per barcode will be 3 files, 'barcodeX.duplex.fastq.gz', 'barcodeX.simplex.fastq.gz', and 'barcodeX.simplex.corrected.fasta.gz'
+# The output per barcode will be 4 files, 'barcodeX.duplex.fastq.gz', 'barcodeX.simplex.fastq.gz', 'barcodeX.simplex.corrected.fasta.gz' and 'barcodeX.pod5.tar.gz'.
+# The script will also output a checksum file 'checksums.md5' for file integrity.
 # Tools that need to be installed and in your path:
 # - Dorado (min 0.7.1) (https://github.com/nanoporetech/dorado)
 # - pod5 tools (https://github.com/nanoporetech/pod5-file-format)
@@ -14,16 +15,43 @@
 # Change these if needed
 # barcoding kit used:
 kit_name="SQK-NBD114-24" 
+sampling_rate="5kHz"
+flowcell_type="R10.4.1"
+duplex_model="dna_r10.4.1_e8.2_5khz_stereo@v1.3"   # Change to latest duplex model
+simplex_model="dna_r10.4.1_e8.2_400bps_sup@v5.0.0" # Change to latest simplex model
+#############################################
 # quality filtering, currently disabled, you can always filter later using chopper
 # quality="10" 
 #############################################
 
+# Function to display help message
+display_help() {
+    echo "Usage: $0 [--rapid] <path_input> <path_output>"
+    echo
+    echo "Options:"
+    echo "  --rapid       Use the rapid barcoding kit (SQK-RBK114-24)"
+    echo
+    echo "Arguments:"
+    echo "  <path_input>  Path to the input folder containing pod5 files"
+    echo "  <path_output> Path to the output folder where results will be stored"
+    exit 1
+}
 
+# Parse command line arguments
+if [ "$#" -eq 0 ]; then
+    display_help
+fi
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --rapid) kit_name="SQK-RBK114-24"; shift ;;
+        *) break ;;
+    esac
+done
 
 # Check if the number of arguments is correct
 if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <path_input> <path_output>"
-    exit 1
+    display_help
 fi
 
 # Function to check if a command is available
@@ -41,14 +69,8 @@ for cmd in "${required_commands[@]}"; do
 done
 
 if [ ${#missing_commands[@]} -ne 0 ]; then
-    echo "Error: The following required programs are not installed: ${missing_commands[*]}"
+    echo "Error: The following required programs are not installed or not in your PATH: ${missing_commands[*]}"
     echo "Please install them before running this script."
-    exit 1
-fi
-
-# Check if the number of arguments is correct
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <path_input> <path_output>"
     exit 1
 fi
 
@@ -59,6 +81,7 @@ path_output="$2"
 # Print the paths
 echo "============================================================================"
 echo "Input files located:     $path_input"
+echo "Using barcoding kit:     $kit_name"
 echo "Output files written to: $path_output"
 echo "============================================================================"
 
@@ -93,11 +116,11 @@ for file in $path_output/split_reads/*.bam;
   samtools view -@ $(nproc) -h -O fastq $file >>  $path_output/split_reads/$id.simplex.untrimmed.fastq;
   done
 
-echo "============================================================================"
+echo "==================================================== test========================"
 echo "$(date) - Generating barcode ID lists"
 echo "============================================================================"
 
-mkdir $path_output/simplex/tmp
+mkdir -p $path_output/simplex/tmp
 
 for file in $path_output/simplex/*.bam; 
   do 
@@ -105,13 +128,16 @@ for file in $path_output/simplex/*.bam;
   samtools view -@ $(nproc) -h $file | cut -f 1 >> $path_output/simplex/tmp/$id.readids.txt; 
   done
 
-for file in $path_output/simplex/tmp/*readids.txt; 
-  do 
-  id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  grep -v "@" $file > $path_output/simplex/tmp/$id.clean.txt; 
-  done
+#parallelise this bit to avoid bottlenecking
 
-mkdir $path_output/pod5_by_barcode
+ls "$path_output/simplex/tmp/"*readids.txt | xargs -P $(nproc) -I {} bash -c ' 
+  file="$1"
+  path_output="$2"
+  id=$(basename "$file" | grep -oP "barcode\\d+")
+  grep -v "@" "$file" > "$path_output/simplex/tmp/$id.clean.txt"
+  ' _ {} "$path_output"
+
+mkdir -p $path_output/pod5_by_barcode
 
 echo "============================================================================"
 echo "$(date) - Separating POD5 files by barcode"
@@ -148,7 +174,8 @@ echo "==========================================================================
 echo "$(date) - Duplex calling of separated reads"
 echo "============================================================================"
 
-mkdir $path_output/duplex
+mkdir -p $path_output/duplex
+mkdir -p $path_output/tmp_model
 
 for folder in $path_output/pod5_by_barcode/*; 
   do 
@@ -156,14 +183,14 @@ for folder in $path_output/pod5_by_barcode/*;
   echo "============================================================================";
   echo "$(date) - Duplex calling $id";
   echo "============================================================================";
-  dorado duplex sup -r $folder > $path_output/duplex/$id.duplex.untrimmed.bam; 
+  dorado duplex sup -r $folder --models-directory $path_output/tmp_model > $path_output/duplex/$id.duplex.untrimmed.bam; 
   done
 
 echo "============================================================================"
 echo "$(date) - Extracting Duplex Reads"
 echo "============================================================================"
 
-mkdir $path_output/duplex/tmp
+mkdir -p $path_output/duplex/tmp
 
 for file in $path_output/duplex/*duplex.untrimmed.bam; 
   do 
@@ -185,17 +212,18 @@ echo "==========================================================================
 echo "$(date) - Merging Simplex reads with split Simplex reads"
 echo "============================================================================"
 
-for file in $path_output/split_reads/*.fastq;
-  do
-  id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  filename=$(basename $file);
-  if [ -f $path_output/simplex/tmp/$filename ]; 
-    then cat $file $path_output/simplex/tmp/$filename > $path_output/simplex/$id.simplex.untrimmed.fastq;
+#parallelise this bit to avoid bottlenecking
+ls "$path_output/split_reads/"*.fastq | xargs -P $(nproc) -I {} bash -c ' 
+  file="$1"
+  path_output="$2"
+  id=$(basename "$file" | grep -oP "barcode\\d+")
+  filename=$(basename "$file") 
+  if [ -f "$path_output/simplex/tmp/$filename" ]; then
+    cat "$file" "$path_output/simplex/tmp/$id.simplex.untrimmed.fastq" > "$path_output/simplex/$id.simplex.untrimmed.fastq"
   else
-    cp $file $path_output/simplex/;
-  fi;
-  done
-
+    cp "$file" "$path_output/simplex/"
+  fi
+  ' _ {} "$path_output"
 
 echo "============================================================================"
 echo "$(date) - Trimming All Reads"
@@ -207,14 +235,14 @@ echo "==========================================================================
 for file in $path_output/duplex/tmp/*duplex.untrimmed.fastq;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file | pigz -9 > $path_output/$id.duplex.fastq.gz 
+  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file | pigz -9 > $path_output/${id}.${duplex_model}.duplex.fastq.gz 
   #dorado trim -t $(nproc) --emit-fastq $file | pigz -9 >  $path_output/$id.duplex.fastq.gz
   done
 
 for file in $path_output/simplex/*simplex.untrimmed.fastq;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file > $path_output/$id.simplex.fastq 
+  chopper --minlength 300 --headcrop 75 --tailcrop 75 -t $(nproc) -i $file > $path_output/${id}.${simplex_model}.simplex.fastq 
   #dorado trim -t $(nproc) --emit-fastq $file >  $path_output/$id.simplex.fastq
   done
 
@@ -234,13 +262,33 @@ for file in $path_output/*.simplex.fastq;
   done
 
 echo "============================================================================"
+echo "$(date) - Archiving Raw Reads"
+echo "============================================================================"
+
+for folder in $path_output/pod5_by_barcode/*
+  do
+  id=$(basename $folder)
+  tar -cf - $folder | pigz -0 - > $path_output/${id}.${sampling_rate}.${flowcell_type}.pod5.tar.gz
+  done
+
+echo "============================================================================"
 echo "$(date) - Cleanup"
 echo "============================================================================"
 
 rm -r $path_output/simplex/
 rm -r $path_output/duplex/
 rm -r $path_output/split_reads/
+rm -r $path_output/pod5_by_barcode/
+rm -r $path_output/tmp_model/
 rm $path_output/all.bam $path_output/splitreads.bam $path_output/*.fai
+
+echo "============================================================================"
+echo "$(date) - Creating file integrity checksum files"
+echo "============================================================================"
+
+cd $path_output
+find  -type f -print0 | xargs -0 md5sum >> checksums.md5
+cd ..
 
 echo "============================================================================"
 echo "$(date) - FINISHED"
