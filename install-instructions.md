@@ -79,24 +79,7 @@ Dorado is an Oxford Nanopore basecalling tool.
 We will now set up a **Conda environment** using Mamba.
 
 ### **Create the environment**
-1. Ensure you have an `environment.yml` file with the following contents:
-
-   ```yaml
-   name: basecalling
-   channels:
-     - bioconda
-     - conda-forge
-     - jannessp
-     - defaults
-   dependencies:
-     - bioconda::samtools=1.21
-     - jannessp::pod5=0.3.23
-     - bioconda::chopper=0.9.1
-     - conda-forge::pigz=2.8
-     - pip
-   variables:
-     PATH: "/opt/dorado/bin:$PATH"
-   ```
+1. Ensure you have an `environment.yml` file with the working software versions.
 
 2. **Create the environment using Mamba**:
    ```bash
