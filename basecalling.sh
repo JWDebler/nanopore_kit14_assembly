@@ -19,6 +19,9 @@ sampling_rate="5kHz"
 flowcell_type="R10.4.1"
 duplex_model="dna_r10.4.1_e8.2_5khz_stereo@v1.3"   # Change to latest duplex model
 simplex_model="dna_r10.4.1_e8.2_400bps_sup@v5.0.0" # Change to latest simplex model
+
+export sampling_rate flowcell_type duplex_model simplex_model
+
 #############################################
 # quality filtering, currently disabled, you can always filter later using chopper
 # quality="10" 
@@ -78,6 +81,8 @@ fi
 path_input="$1"
 path_output="$2"
 
+export path_output
+
 # Print the paths
 echo "============================================================================"
 echo "Input files located:     $path_input"
@@ -107,6 +112,7 @@ echo "==========================================================================
 
 dorado demux -t $(nproc) --output-dir $path_output/simplex --no-classify $path_output/all.bam
 dorado demux -t $(nproc) --output-dir $path_output/split_reads --no-classify $path_output/splitreads.bam
+
 rm $path_output/simplex/*unclassified.bam
 rm $path_output/split_reads/*unclassified.bam
 
@@ -116,7 +122,7 @@ for file in $path_output/split_reads/*.bam;
   samtools view -@ $(nproc) -h -O fastq $file >>  $path_output/split_reads/$id.simplex.untrimmed.fastq;
   done
 
-echo "==================================================== test========================"
+echo "============================================================================"
 echo "$(date) - Generating barcode ID lists"
 echo "============================================================================"
 
@@ -137,16 +143,16 @@ ls "$path_output/simplex/tmp/"*readids.txt | xargs -P $(nproc) -I {} bash -c '
   grep -v "@" "$file" > "$path_output/simplex/tmp/$id.clean.txt"
   ' _ {} "$path_output"
 
-mkdir -p $path_output/pod5_by_barcode
-
 echo "============================================================================"
 echo "$(date) - Separating POD5 files by barcode"
 echo "============================================================================"
 
+mkdir -p $path_output/pod5_by_barcode
+
 for file in $path_output/simplex/tmp/*clean.txt; 
   do 
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  pod5 filter -r $path_input -i $file -t $(nproc) --missing-ok --duplicate-ok --output $path_output/pod5_by_barcode/$id.pod5; 
+  pod5 filter -r $path_input -i $file -t $(nproc) --missing-ok --duplicate-ok --output $path_output/pod5_by_barcode/$id.pod5 > /dev/null 2>&1 ; 
   done
 
 echo "============================================================================"
@@ -166,7 +172,7 @@ echo "==========================================================================
 for file in $path_output/simplex/tmp/*.summary.tsv; 
   do 
   id=$(echo "$file" | grep -oP 'barcode\d+'); 
-  pod5 subset $path_output/pod5_by_barcode/$id.pod5 -t $(nproc) --summary $file --columns channel --output $path_output/pod5_by_barcode/$id; 
+  pod5 subset $path_output/pod5_by_barcode/$id.pod5 -t $(nproc) --summary $file --columns channel --output $path_output/pod5_by_barcode/$id > /dev/null 2>&1 ; 
   rm $path_output/pod5_by_barcode/$id.pod5;
   done
 
@@ -179,11 +185,13 @@ mkdir -p $path_output/tmp_model
 
 for folder in $path_output/pod5_by_barcode/*; 
   do 
+  if [ -d "$folder" ]; then
   id=$(basename $folder); 
   echo "============================================================================";
   echo "$(date) - Duplex calling $id";
   echo "============================================================================";
   dorado duplex sup -r $folder --models-directory $path_output/tmp_model > $path_output/duplex/$id.duplex.untrimmed.bam; 
+  fi
   done
 
 echo "============================================================================"
@@ -256,20 +264,21 @@ for file in $path_output/*.simplex.fastq;
   echo "============================================================================";
   echo "$(date) - Correcting $id";
   echo "============================================================================";
-  dorado correct $file > $path_output/$id.simplex.corrected.fasta;
+  dorado correct $file > $path_output/${id}.simplex.corrected.fasta;
   pigz -9 $file;
-  pigz -9 $path_output/$id.simplex.corrected.fasta
+  pigz -9 $path_output/${id}.simplex.corrected.fasta 
+  mv $path_output/${id}.simplex.corrected.fasta.gz $path_output/${id}.${simplex_model}.simplex.corrected.fasta.gz
   done
 
 echo "============================================================================"
 echo "$(date) - Archiving Raw Reads"
 echo "============================================================================"
 
-for folder in $path_output/pod5_by_barcode/*
-  do
-  id=$(basename $folder)
-  tar -cf - $folder | pigz -0 - > $path_output/${id}.${sampling_rate}.${flowcell_type}.pod5.tar.gz
-  done
+find "$path_output/pod5_by_barcode" -mindepth 1 -maxdepth 1 -type d | xargs -P $(nproc) -I {} bash -c '
+    folder="{}"
+    id=$(basename "$folder")
+    tar -cf - "$folder" | pigz -0 - > "$path_output/${id}.${sampling_rate}.${flowcell_type}.pod5.tar.gz"
+'
 
 echo "============================================================================"
 echo "$(date) - Cleanup"
@@ -287,7 +296,7 @@ echo "$(date) - Creating file integrity checksum files"
 echo "============================================================================"
 
 cd $path_output
-find  -type f -print0 | xargs -0 md5sum >> checksums.md5
+find . -type f -name "*.gz" -print0 | xargs -0 md5sum >> checksums.md5
 cd ..
 
 echo "============================================================================"
