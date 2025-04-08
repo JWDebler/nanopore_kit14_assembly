@@ -258,13 +258,16 @@ echo "==========================================================================
 echo "$(date) - Simplex correction"
 echo "============================================================================"
 
+dorado download --model herro-v1
+
 for file in $path_output/*.simplex.fastq;
   do
   id=$(echo "$file" | grep -oP 'barcode\d+');
   echo "============================================================================";
   echo "$(date) - Correcting $id";
   echo "============================================================================";
-  dorado correct $file > $path_output/${id}.simplex.corrected.fasta;
+  # dorado correct defaults have chaneged as of 0.9.5, so now we have to supply these as additional arguments in order not to lose almost all reads
+  dorado correct -m herro-v1 $file --min-chain-score 4000 --mid-occ-frac 0.0002 > $path_output/${id}.simplex.corrected.fasta;
   pigz -9 $file;
   pigz -9 $path_output/${id}.simplex.corrected.fasta 
   mv $path_output/${id}.simplex.corrected.fasta.gz $path_output/${id}.${simplex_model}.simplex.corrected.fasta.gz
@@ -289,6 +292,7 @@ rm -r $path_output/duplex/
 rm -r $path_output/split_reads/
 rm -r $path_output/pod5_by_barcode/
 rm -r $path_output/tmp_model/
+rm -r .temp_dorado_model*/
 rm $path_output/all.bam $path_output/splitreads.bam $path_output/*.fai
 
 echo "============================================================================"
