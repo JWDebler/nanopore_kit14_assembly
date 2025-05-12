@@ -274,26 +274,26 @@ for file in $path_output/*.simplex.fastq;
   done
 
 echo "============================================================================"
-echo "$(date) - Archiving Raw Reads"
-echo "============================================================================"
-
-find "$path_output/pod5_by_barcode" -mindepth 1 -maxdepth 1 -type d | xargs -P $(nproc) -I {} bash -c '
-    folder="{}"
-    id=$(basename "$folder")
-    tar -cf - "$folder" | pigz -0 - > "$path_output/${id}.${sampling_rate}.${flowcell_type}.pod5.tar.gz"
-'
-
-echo "============================================================================"
 echo "$(date) - Cleanup"
 echo "============================================================================"
 
 rm -r $path_output/simplex/
 rm -r $path_output/duplex/
 rm -r $path_output/split_reads/
-rm -r $path_output/pod5_by_barcode/
 rm -r $path_output/tmp_model/
 rm -r .temp_dorado_model*/
 rm $path_output/all.bam $path_output/splitreads.bam $path_output/*.fai
+
+echo "============================================================================"
+echo "$(date) - Archiving Raw Reads"
+echo "============================================================================"
+
+for folder in $path_output/pod5_by_barcode/*
+  do
+  id=$(basename $folder)
+  tar -cf - $folder | pigz -0 - > $path_output/${id}.${sampling_rate}.${flowcell_type}.pod5.tar.gz
+  rm -r $folder
+  done
 
 echo "============================================================================"
 echo "$(date) - Creating file integrity checksum files"
