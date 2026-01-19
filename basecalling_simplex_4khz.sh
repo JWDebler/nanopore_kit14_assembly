@@ -5,7 +5,7 @@
 # The output per barcode will be 3 files, 'barcodeX.simplex.fastq.gz', 'barcodeX.simplex.corrected.fasta.gz' and 'barcodeX.pod5.tar.gz'.
 # The script will also output a checksum file 'checksums.md5' for file integrity.
 # Tools that need to be installed and in your path:
-# - Dorado (min 0.7.1) (https://github.com/nanoporetech/dorado)
+# - Dorado (min 1.3.0 (https://github.com/nanoporetech/dorado)
 # - pod5 tools (https://github.com/nanoporetech/pod5-file-format)
 # - samtools (sudo apt install samtools)
 # - pigz (sudo apt install pigz)
@@ -14,10 +14,10 @@
 #
 # Change these if needed
 # barcoding kit used:
-kit_name="EXP-NBD104" 
+kit_name="SQK-NBD114-96" 
 sampling_rate="4kHz"
-flowcell_type="R9.4.1"
-simplex_model="dna_r9.4.1_e8_sup@v3.6" # Change to latest simplex model
+flowcell_type="R10.4.1"
+simplex_model="dna_r10.4.1_e8.2_400bps_sup@v4.1.0" # Change to latest simplex model
 dorado_path="/opt/dorado/dorado-0.9.6-linux-x64/bin/dorado"
 
 export sampling_rate flowcell_type simplex_model
@@ -251,32 +251,51 @@ echo "==========================================================================
 
 # STEP 1: SUP basecalling
 if ! skip_if_done "basecalling" "SUP basecalling"; then
-
-    $dorado_path basecaller /opt/dorado/models/dna_r9.4.1_e8_sup@v3.6  -r "$path_input" --kit-name "$kit_name" > "$path_output/all.bam"
+    # Capture existing directories before basecalling
+    existing_dirs=$(find "$path_output" -maxdepth 1 -type d ! -path "$path_output" -printf "%f\n" 2>/dev/null | sort)
+    
+    $dorado_path basecaller sup$methylation -r "$path_input" --kit-name "$kit_name" -o "$path_output"
+    
+    # Capture new directories after basecalling
+    new_dirs=$(find "$path_output" -maxdepth 1 -type d ! -path "$path_output" -printf "%f\n" 2>/dev/null | sort)
+    
+    # Store the difference (new directories created by dorado)
+    dorado_created_dirs=$(comm -13 <(echo "$existing_dirs") <(echo "$new_dirs"))
+    echo "$dorado_created_dirs" > "$path_output/.dorado_created_dirs"
+    
     create_checkpoint "basecalling"
 fi
 
-# STEP 2: Read demultiplexing
-if ! skip_if_done "demultiplexing" "read demultiplexing"; then
-
-    $dorado_path demux -t $(nproc) --output-dir "$path_output/simplex" --no-classify "$path_output/all.bam"
-    rm -f "$path_output/simplex/"*unclassified.bam
-    rm -f "$path_output/all.bam"
-    create_checkpoint "demultiplexing"
-fi
-
-#STEP 3: Merging BAM files
+#STEP 2: Merging BAM files
 if ! skip_if_done "merging_bam" "merging BAM files"; then
 
-    for id in $(find "$path_output/simplex/" -name "*.bam" | grep -oP 'barcode\d+(?=\.bam)' | sort -u); do
-      bam_files=$(find "$path_output/simplex/" -name "*${id}.bam" | tr '\n' ' ')
-      samtools merge -@ $(nproc) -o "$path_output/${id}.${simplex_model}${methylation}.bam" $bam_files
+    # First, collect all unique barcode IDs across all FLOWCELLID directories
+    unique_barcodes=$(find "$path_output" -type d -name "barcode[0-9][0-9]" | grep "/bam_pass/" | sed 's/.*\/\(barcode[0-9][0-9]\)$/\1/' | sort -u)
+    
+    # Process each unique barcode
+    for barcode_id in $unique_barcodes; do
+        echo "Processing barcode: $barcode_id"
+        
+        # Find ALL bam files for this barcode across ALL FLOWCELLID directories
+        bam_files=$(find "$path_output" -path "*/bam_pass/${barcode_id}/*.bam" | tr '\n' ' ')
+        
+        if [ -n "$bam_files" ]; then
+            echo "Merging bam files for $barcode_id from multiple flowcells:"
+            echo "  Files: $bam_files"
+            samtools merge -@ $(nproc) -o "$path_output/${barcode_id}.${simplex_model}${methylation}.bam" $bam_files
+            echo "  Successfully merged $barcode_id"
+        else
+            echo "No bam files found for $barcode_id"
+        fi
     done
-      rm -f "$path_output/simplex/"*.bam
-      create_checkpoint "merging_bam"
+    
+    # Clean up the original bam files after merging
+    find "$path_output" -name "*.bam" -path "*/bam_pass/*" -delete
+    
+    create_checkpoint "merging_bam"
 fi
 
-# STEP 4: Generating barcode ID lists
+# STEP 3: Generating barcode ID lists
 if ! skip_if_done "barcode_ids" "generating barcode ID lists"; then
 
     mkdir -p "$path_output/simplex/tmp"
@@ -297,7 +316,7 @@ if ! skip_if_done "barcode_ids" "generating barcode ID lists"; then
     create_checkpoint "barcode_ids"
 fi
 
-# STEP 5: Extracting Simplex Reads
+# STEP 4: Extracting Simplex Reads
 if ! skip_if_done "simplex_extraction" "extracting Simplex Reads"; then
 
     for file in "$path_output/"*.bam; do 
@@ -305,20 +324,80 @@ if ! skip_if_done "simplex_extraction" "extracting Simplex Reads"; then
         $dorado_path demux -t $(nproc) --output-dir "$path_output/simplex/" --no-classify "$file" --emit-fastq
     done
 
-    cd $path_output/simplex/
+    # Find all fastq files with barcodes in any subdirectory and merge by barcode
+    for barcode in $(find "$path_output/simplex" -name "*barcode[0-9][0-9]*" -name "*.fastq*" | grep -oP 'barcode\d+' | sort -u); do
+        echo "Merging files for $barcode"
+        find "$path_output" -name "*${barcode}*" -name "*.fastq*" -exec cat {} \; > "$path_output/${barcode}.${simplex_model}.fastq"
+    done
 
-    for barcode in $(ls *.fastq* | grep -oP 'barcode\d+' | sort -u); do
-        cat *${barcode}.fastq* > ../${barcode}.${simplex_model}.fastq
-        pigz -9 ../${barcode}.${simplex_model}.fastq
-    done 
-
-    cd ../..
-    rm -f "$path_output/simplex/"*.fastq
     create_checkpoint "simplex_extraction"
 fi
 
+# STEP 5: Simplex correction
+if ! skip_if_done "simplex_correction" "simplex correction"; then
+    # Download model if not already present
+    if ! checkpoint_exists "model_download"; then
+        dorado download --model herro-v1
+        create_checkpoint "model_download"
+    fi
+    
+    # Create temporary directory
+    mkdir -p "$path_output/tmp_correction"
+    
+    for file in "$path_output/"*.fastq; do
+        id=$(echo "$file" | grep -oP 'barcode\d+');
+        
+        final_file="$path_output/${id}.${simplex_model}.simplex.corrected.fasta.gz"
+        temp_file="$path_output/tmp_correction/${id}.simplex.corrected.fasta"
+        temp_gz_file="$path_output/tmp_correction/${id}.simplex.corrected.fasta.gz"
+        
+        # Skip if final corrected file already exists and is not empty
+        if [[ -f "$final_file" && -s "$final_file" ]]; then
+            echo "$(date) - Skipping correction for $id (already exists)"
+            continue
+        fi
+        
+        # Clean up any existing temporary files for this barcode
+        rm -f "$temp_file" "$temp_gz_file"
+        
+        echo "============================================================================";
+        echo "$(date) - Correcting $id";
+        echo "============================================================================";
+        
+        # dorado correct defaults have changed as of 0.9.5, so now we have to supply these as additional arguments in order not to lose almost all reads
+        if $dorado_path correct -m herro-v1 "$file" --min-chain-score 4000 --mid-occ-frac 0.0002 > "$temp_file"; then
+            # Only proceed if dorado correct succeeded
+            if [[ -f "$temp_file" && -s "$temp_file" ]]; then
+                # Compress the corrected file
+                if pigz -9 "$temp_file"; then
+                    # Move to final location only if compression succeeded
+                    mv "$temp_gz_file" "$final_file"
+                    echo "$(date) - Successfully completed correction for $id"
+                    
+                    # Compress original fastq file
+                    pigz -9 "$file"
+                else
+                    echo "$(date) - Failed to compress corrected file for $id"
+                    rm -f "$temp_file" "$temp_gz_file"
+                fi
+            else
+                echo "$(date) - Correction produced empty file for $id"
+                rm -f "$temp_file"
+            fi
+        else
+            echo "$(date) - dorado correct failed for $id"
+            rm -f "$temp_file"
+        fi
+    done
+    
+    # Clean up temporary directory
+    rmdir "$path_output/tmp_correction" 2>/dev/null || true
+    
+    create_checkpoint "simplex_correction"
+fi
 
-# STEP 7: Separating POD5 files by barcode
+
+# STEP 6: Separating POD5 files by barcode
 if ! skip_if_done "pod5_separation" "separating POD5 files by barcode"; then
 
     mkdir -p "$path_output/pod5_by_barcode"
@@ -354,7 +433,7 @@ if ! skip_if_done "pod5_separation" "separating POD5 files by barcode"; then
     create_checkpoint "pod5_separation"
 fi
 
-# STEP 8: Archiving Raw Reads
+# STEP 7: Archiving Raw Reads
 if ! skip_if_done "archiving" "archiving Raw Reads"; then
 
     for file in "$path_output/pod5_by_barcode/"*.pod5; do
@@ -383,7 +462,7 @@ if ! skip_if_done "archiving" "archiving Raw Reads"; then
     create_checkpoint "archiving"
 fi
 
-# STEP 9: Creating file integrity checksum files
+# STEP 8: Creating file integrity checksum files
 if ! skip_if_done "checksums" "creating file integrity checksum files"; then
 
     # If sample mapping is provided, rename files before checksums
@@ -391,7 +470,7 @@ if ! skip_if_done "checksums" "creating file integrity checksum files"; then
         for barcode in "${!barcode_to_sample[@]}"; do
             sample="${barcode_to_sample[$barcode]}"
             # Rename all relevant files in output directory
-            for ext in ".bam" ".fastq.gz" ".pod5.tar.gz"; do
+            for ext in ".bam" ".fastq.gz" ".simplex.corrected.fasta.gz" ".pod5.tar.gz"; do
                 for f in "$path_output/"${barcode}*${ext}; do
                     [ -e "$f" ] || continue
                     newf="${f//$barcode/$sample}"
@@ -412,7 +491,7 @@ if ! skip_if_done "checksums" "creating file integrity checksum files"; then
     # Output file manifest: list all output files and their sample associations
     manifest_file="$path_output/output_manifest.tsv"
     echo -e "output_file\tsample_or_barcode" > "$manifest_file"
-    for f in "$path_output"/*.{bam,fastq.gz,pod5.tar.gz}; do
+    for f in "$path_output"/*.{bam,fastq.gz,simplex.corrected.fasta.gz,pod5.tar.gz}; do
         [ -e "$f" ] || continue
         fname=$(basename "$f")
         # Try to extract sample or barcode from filename
@@ -451,10 +530,11 @@ if ! skip_if_done "cleanup" "cleanup"; then
 
     rm -r "$path_output/simplex/"
     rm -r "$path_output/pod5_by_barcode/"
+    rm -r "herro-v1"
     rm -rf "$path_output/tmp_model/"
     rm -rf .temp_dorado_model*/
     rm "$path_output/"*.fai 
-    
+
     create_checkpoint "cleanup"
 fi
 

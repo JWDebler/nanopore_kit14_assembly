@@ -14,10 +14,11 @@
 #
 # Change these if needed
 # barcoding kit used:
-kit_name="SQK-NBD114-24" 
+kit_name="SQK-NBD114-96" 
 sampling_rate="5kHz"
 flowcell_type="R10.4.1"
 simplex_model="dna_r10.4.1_e8.2_400bps_sup@v5.2.0" # Change to latest simplex model
+dorado_path="/opt/dorado/current/bin/dorado"
 
 export sampling_rate flowcell_type simplex_model
 
@@ -192,7 +193,7 @@ command_exists() {
 }
 
 # Check if required commands are installed
-required_commands=("/opt/dorado/current/bin/dorado" "samtools" "pod5" "pigz")
+required_commands=("$dorado_path" "samtools" "pod5" "pigz")
 missing_commands=()
 for cmd in "${required_commands[@]}"; do
     if ! command_exists "$cmd"; then
@@ -253,7 +254,7 @@ if ! skip_if_done "basecalling" "SUP basecalling"; then
     # Capture existing directories before basecalling
     existing_dirs=$(find "$path_output" -maxdepth 1 -type d ! -path "$path_output" -printf "%f\n" 2>/dev/null | sort)
     
-    /opt/dorado/current/bin/dorado basecaller sup$methylation -r "$path_input" --kit-name "$kit_name" -o "$path_output"
+    $dorado_path basecaller sup$methylation -r "$path_input" --kit-name "$kit_name" -o "$path_output"
     
     # Capture new directories after basecalling
     new_dirs=$(find "$path_output" -maxdepth 1 -type d ! -path "$path_output" -printf "%f\n" 2>/dev/null | sort)
@@ -320,7 +321,7 @@ if ! skip_if_done "simplex_extraction" "extracting Simplex Reads"; then
 
     for file in "$path_output/"*.bam; do 
         id=$(echo "$file" | grep -oP 'barcode\d+');  
-        /opt/dorado/current/bin/dorado demux -t $(nproc) --output-dir "$path_output/simplex/" --no-classify "$file" --emit-fastq
+        $dorado_path demux -t $(nproc) --output-dir "$path_output/simplex/" --no-classify "$file" --emit-fastq
     done
 
     # Find all fastq files with barcodes in any subdirectory and merge by barcode
@@ -364,7 +365,7 @@ if ! skip_if_done "simplex_correction" "simplex correction"; then
         echo "============================================================================";
         
         # dorado correct defaults have changed as of 0.9.5, so now we have to supply these as additional arguments in order not to lose almost all reads
-        if /opt/dorado/current/bin/dorado correct -m herro-v1 "$file" --min-chain-score 4000 --mid-occ-frac 0.0002 > "$temp_file"; then
+        if $dorado_path correct -m herro-v1 "$file" --min-chain-score 4000 --mid-occ-frac 0.0002 > "$temp_file"; then
             # Only proceed if dorado correct succeeded
             if [[ -f "$temp_file" && -s "$temp_file" ]]; then
                 # Compress the corrected file
