@@ -19,6 +19,7 @@ sampling_rate="5kHz"
 flowcell_type="R10.4.1"
 simplex_model="dna_r10.4.1_e8.2_400bps_sup@v5.2.0" # Change to latest simplex model
 dorado_path="/opt/dorado/current/bin/dorado"
+herro_model="herro_v1.1" # for dorado 2.1.0+, for older verisons use herro_v1
 
 export sampling_rate flowcell_type simplex_model
 
@@ -337,7 +338,7 @@ fi
 if ! skip_if_done "simplex_correction" "simplex correction"; then
     # Download model if not already present
     if ! checkpoint_exists "model_download"; then
-        dorado download --model herro-v1
+        $dorado_path download --model "$herro_model"
         create_checkpoint "model_download"
     fi
     
@@ -365,7 +366,7 @@ if ! skip_if_done "simplex_correction" "simplex correction"; then
         echo "============================================================================";
         
         # dorado correct defaults have changed as of 0.9.5, so now we have to supply these as additional arguments in order not to lose almost all reads
-        if $dorado_path correct -m herro-v1 "$file" --min-chain-score 4000 --mid-occ-frac 0.0002 > "$temp_file"; then
+        if $dorado_path correct -m "$herro_model" "$file" --min-chain-score 4000 --mid-occ-frac 0.0002 > "$temp_file"; then
             # Only proceed if dorado correct succeeded
             if [[ -f "$temp_file" && -s "$temp_file" ]]; then
                 # Compress the corrected file
