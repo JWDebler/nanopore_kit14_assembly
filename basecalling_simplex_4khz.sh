@@ -1,15 +1,8 @@
 #!/bin/bash
 
 #############################################
-# This script is meant to  basecall a folder of multiplexed pod5 files and separate the raw data by barcode and channel.
-# The output per barcode will be 3 files, 'barcodeX.simplex.fastq.gz', 'barcodeX.simplex.corrected.fasta.gz' and 'barcodeX.pod5.tar.gz'.
-# The script will also output a checksum file 'checksums.md5' for file integrity.
-# Tools that need to be installed and in your path:
-# - Dorado (min 1.3.0 (https://github.com/nanoporetech/dorado)
-# - pod5 tools (https://github.com/nanoporetech/pod5-file-format)
-# - samtools (sudo apt install samtools)
-# - pigz (sudo apt install pigz)
-# - chopper (https://github.com/wdecoster/chopper)
+# This script is meant to  basecall a folder of multiplexed pod5 files and separate the raw data by barcode
+# This version of the script is the last that can call 4khz data for 10.4.1 flowcells
 #############################################
 #
 # Change these if needed
@@ -17,8 +10,8 @@
 kit_name="SQK-NBD114-96" 
 sampling_rate="4kHz"
 flowcell_type="R10.4.1"
-simplex_model="dna_r10.4.1_e8.2_400bps_sup@v4.1.0" # Change to latest simplex model
-dorado_path="/opt/dorado/dorado-0.9.6-linux-x64/bin/dorado"
+simplex_model="dna_r10.4.1_e8.2_400bps_sup@v4.1.0" # last model for dorado 0.9.6
+dorado_path="/opt/dorado/dorado-0.9.6-linux-x64/bin/dorado" # last version supporting 4khz data
 
 export sampling_rate flowcell_type simplex_model
 
@@ -94,7 +87,7 @@ while [[ "$#" -gt 0 ]]; do
             shift
             ;;
         --methylation)
-            methylation=",5mC_5hmC,6mA"
+            methylation=",5mCG_5hmCG@v2"
             shift
             ;;
         --resume)
