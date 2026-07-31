@@ -296,24 +296,21 @@ if ! skip_if_done "merging_bam" "merging BAM files"; then
     create_checkpoint "merging_bam"
 fi
 
-# STEP 3: Generating barcode ID lists
+# STEP 3: Generating barcode ID lists for POD5 filtering
 if ! skip_if_done "barcode_ids" "generating barcode ID lists"; then
 
     mkdir -p "$path_output/simplex/tmp"
-    
-    for file in "$path_output/"*.bam; do 
-        id=$(echo "$file" | grep -oP 'barcode\d+'); 
-        samtools view -@ $(nproc) -h "$file" | cut -f 1 > "$path_output/simplex/tmp/$id.readids.txt"; 
+
+    for file in "$path_output/"*.bam; do
+        [ -e "$file" ] || continue
+
+        id=$(basename "$file" | grep -oP 'barcode\d+')
+
+        samtools view -@ "$(nproc)" "$file" \
+            | cut -f1 \
+            > "$path_output/simplex/tmp/$id.clean.txt"
     done
-    
-    # Parallelise this bit to avoid bottlenecking
-    ls "$path_output/simplex/tmp/"*readids.txt | xargs -P $(nproc) -I {} bash -c ' 
-        file="$1"
-        path_output="$2"
-        id=$(basename "$file" | grep -oP "barcode\\d+")
-        grep -v "@" "$file" > "$path_output/simplex/tmp/$id.clean.txt"
-    ' _ {} "$path_output"
-    
+
     create_checkpoint "barcode_ids"
 fi
 
@@ -328,7 +325,7 @@ if ! skip_if_done "simplex_extraction" "extracting Simplex Reads"; then
     # Find all fastq files with barcodes in any subdirectory and merge by barcode
     for barcode in $(find "$path_output/simplex" -name "*barcode[0-9][0-9]*" -name "*.fastq*" | grep -oP 'barcode\d+' | sort -u); do
         echo "Merging files for $barcode"
-        find "$path_output" -name "*${barcode}*" -name "*.fastq*" -exec cat {} \; > "$path_output/${barcode}.${simplex_model}.fastq"
+        find "$path_output/simplex" -name "*${barcode}*" -name "*.fastq*" -exec cat {} + > "$path_output/${barcode}.${simplex_model}.fastq"
     done
 
     create_checkpoint "simplex_extraction"
