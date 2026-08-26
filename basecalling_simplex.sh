@@ -19,7 +19,7 @@ sampling_rate="5kHz"
 flowcell_type="R10.4.1"
 simplex_model="dna_r10.4.1_e8.2_400bps_sup@v5.2.0" # Change to latest simplex model
 dorado_path="/opt/dorado/current/bin/dorado"
-herro_model="herro_v1.1" # for dorado 2.1.0+, for older verisons use herro_v1
+herro_model="herro-v1.1" # for dorado 2.1.0+, for older verisons use herro_v1
 
 export sampling_rate flowcell_type simplex_model
 
